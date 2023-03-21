@@ -3,6 +3,10 @@ name = "vpe"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "vpe"
+path = "src/lib.rs"
+
 [toolchain]
 channel = "nightly"
 
