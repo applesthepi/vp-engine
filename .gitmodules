@@ -1,0 +1,3 @@
+[submodule "vp-base"]
+	path = vp-base
+	url = https://github.com/applesthepi/vp-base
