@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "vpe"
-path = "src/lib.rs"
+path = "src/vpe.rs"
 
 [toolchain]
 channel = "nightly"
