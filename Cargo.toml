@@ -19,3 +19,7 @@ opt-level = 0
 
 [dependencies]
 vpb = { path="vp-base" }
+winit = "0.28.3"
+ash = { version = "0.37.2+1.3.238", features = ["linked"] }
+shaderc = "0.8.2"
+memoffset = "0.8.0"
