@@ -11,6 +11,7 @@ FR: Fn(&mut Box<Scene>) + 'static {
 	pub window: vpb::Window,
 	pub surface: vpb::Surface,
 	pub scene: Box<Scene>,
+	pub shader_loader: Arc<vpb::ShaderLoader>,
 	fn_open: FO,
 	fn_close: FC,
 	fn_render: FR,
@@ -39,15 +40,41 @@ FR: Fn(&mut Box<Scene>) + 'static {
 			&instance,
 			&window,
 		);
-		let device: vpb::Device::new();
+		let device = vpb::Device::new(
+			&instance,
+			&surface,
+		);
+		let swapchain = vpb::Swapchain::new(
+			&instance,
+			&window,
+			&surace,
+			&device,
+		);
+		let command_pool = vpb::CommandPool::new(
+			&device,
+		);
+		let command_buffer = vpb::CommandBuffer::new(
+			&mut device,
+			&mut command_pool,
+			&swapchain,
+		);
+		let renderpass = vpb::RenderPass::new(
+			&device,
+			&swapchain,
+		);
+		let shader_loader = Arc::new(vpb::ShaderLoader::new());
 		let scene = Scene::new(
-
+			&device,
+			&window,
+			&renderpass,
+			&shader_loader,
 		);
 		Self {
 			instance,
 			window,
 			surface,
 			scene: Box::new(scene),
+			shader_loader,
 			fn_open,
 			fn_close,
 			fn_render,

@@ -90,7 +90,7 @@ fn create_pipeline<V: Vertex>(
 	renderpass: &vpb::RenderPass,
 	stages: &[vk::PipelineShaderStageCreateInfo],
 	pipeline_info: PipelineInfo,
-) -> vk::Pipeline { unsafe {
+) -> (vk::Pipeline, [vk::Viewport; 1], [vk::Rect2D; 1]) { unsafe {
 	let binding_descriptions = [
 		vk::VertexInputBindingDescription::builder()
 			.binding(0)
@@ -173,17 +173,17 @@ fn create_pipeline<V: Vertex>(
 		let graphics_pipeline_info = graphics_pipeline_info.depth_stencil_state(
 			&depth_state_info,
 		).build();
-		device.device.create_graphics_pipelines(
+		(device.device.create_graphics_pipelines(
 			vk::PipelineCache::null(),
 			&[graphics_pipeline_info],
 			None,
-		).unwrap()[0]
+		).unwrap()[0], viewports, scissors)
 	} else {
 		let graphics_pipeline_info = graphics_pipeline_info.build();
-		device.device.create_graphics_pipelines(
+		(device.device.create_graphics_pipelines(
 			vk::PipelineCache::null(),
 			&[graphics_pipeline_info],
 			None,
-		).unwrap()[0]
+		).unwrap()[0], viewports, scissors)
 	}
 }}

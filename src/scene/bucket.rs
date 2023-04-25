@@ -4,7 +4,7 @@ use crate::Object;
 
 pub struct Bucket {
 	pub name: String,
-	pipeline: Box<dyn vpb::Pipeline>,
+	pub pipeline: Box<dyn vpb::Pipeline>,
 	objects: Vec<Arc<dyn Object>>,
 }
 
@@ -37,5 +37,14 @@ impl Bucket {
 		object: Arc<dyn Object>,
 	) {
 		self.objects.push(object);
+	}
+
+	pub fn render(
+		&mut self,
+		command_buffer: vk::CommandBuffer,
+	) {
+		for object in self.objects.iter() {
+			object.render();
+		}
 	}
 }

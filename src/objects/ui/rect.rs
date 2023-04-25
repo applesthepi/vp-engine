@@ -25,4 +25,10 @@ impl Object for ObjectRect {
 	fn name(&self) -> &String {
 		&self.name
 	}
+	fn render(
+		&self,
+		command_buffer: vk::CommandBuffer,
+	) {
+
+	}
 }

@@ -7,6 +7,8 @@ use crate::{Vertex, ViewportDepthRange, create_graphics_pipeline, PipelineInfo};
 pub struct PipelineSimple<V: Vertex> {
 	vertex: PhantomData<V>,
 	pub pipeline: vk::Pipeline,
+	pub viewport: [vk::Viewport; 1],
+	pub scissor: [vk::Rect2D; 1],
 }
 
 impl<V: Vertex> PipelineSimple<V> {
@@ -16,7 +18,7 @@ impl<V: Vertex> PipelineSimple<V> {
 		renderpass: &vpb::RenderPass,
 		shader_loader: &Arc<vpb::ShaderLoader>,
 	) -> Self {
-		let pipeline = create_graphics_pipeline::<V>(
+		let (pipeline, viewport, scissor) = create_graphics_pipeline::<V>(
 			device,
 			window,
 			renderpass,
@@ -31,6 +33,17 @@ impl<V: Vertex> PipelineSimple<V> {
 		Self {
 			vertex: PhantomData,
 			pipeline,
+			viewport,
+			scissor,
 		}
+	}
+}
+
+impl<V: Vertex> vpb::Pipeline for PipelineSimple<V> {
+	fn get_viewport(&self) -> [vk::Viewport; 1] {
+		self.viewport
+	}
+	fn get_scissor(&self) -> [vk::Rect2D; 1] {
+		self.scissor
 	}
 }
