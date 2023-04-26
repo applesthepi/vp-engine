@@ -3,14 +3,13 @@ use std::mem;
 use ash::vk;
 use memoffset::offset_of;
 
-use crate::Vertex;
-
+#[derive(Clone, Copy)]
 pub struct VertexUI {
 	pub position: [f32; 2],
 	pub color: [f32; 4],
 }
 
-impl Vertex for VertexUI {
+impl vpb::Vertex for VertexUI {
 	fn stride() -> u32 {
 		mem::size_of::<VertexUI>() as u32
 	}

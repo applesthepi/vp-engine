@@ -2,16 +2,16 @@ use std::{sync::Arc, marker::PhantomData};
 
 use ash::vk;
 
-use crate::{Vertex, ViewportDepthRange, create_graphics_pipeline, PipelineInfo};
+use crate::{ViewportDepthRange, create_graphics_pipeline, PipelineInfo};
 
-pub struct PipelineSimple<V: Vertex> {
+pub struct PipelineSimple<V: vpb::Vertex> {
 	vertex: PhantomData<V>,
 	pub pipeline: vk::Pipeline,
 	pub viewport: [vk::Viewport; 1],
 	pub scissor: [vk::Rect2D; 1],
 }
 
-impl<V: Vertex> PipelineSimple<V> {
+impl<V: vpb::Vertex> PipelineSimple<V> {
 	pub fn new(
 		device: &vpb::Device,
 		window: &vpb::Window,

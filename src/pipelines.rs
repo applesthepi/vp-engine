@@ -6,8 +6,6 @@ use shaderc::ShaderKind;
 pub use simple::*;
 use vpb::{load_shader, create_stage_infos};
 
-use crate::Vertex;
-
 pub enum ViewportDepthRange {
 	UI,
 	WORLD,
@@ -43,7 +41,7 @@ pub fn create_extent(
 	window.extent.into()
 }
 
-pub fn create_graphics_pipeline<V: Vertex>(
+pub fn create_graphics_pipeline<V: vpb::Vertex>(
 	device: &vpb::Device,
 	window: &vpb::Window,
 	renderpass: &vpb::RenderPass,
@@ -84,7 +82,7 @@ pub fn create_graphics_pipeline<V: Vertex>(
 	)
 }
 
-fn create_pipeline<V: Vertex>(
+fn create_pipeline<V: vpb::Vertex>(
 	device: &vpb::Device,
 	window: &vpb::Window,
 	renderpass: &vpb::RenderPass,
