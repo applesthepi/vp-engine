@@ -1,32 +1,20 @@
+use std::sync::Arc;
+
 use winit::{event_loop::ControlFlow, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}};
 
 use crate::Scene;
 
-pub struct Program<FO, FC, FR>
-where
-FO: Fn(&mut Box<Scene>) + 'static,
-FC: Fn(&mut Box<Scene>) + 'static,
-FR: Fn(&mut Box<Scene>) + 'static {
+pub struct Program<'a> {
 	pub instance: vpb::Instance,
-	pub window: vpb::Window,
 	pub surface: vpb::Surface,
+	pub window: vpb::Window,
 	pub scene: Box<Scene>,
-	pub shader_loader: Arc<vpb::ShaderLoader>,
-	fn_open: FO,
-	fn_close: FC,
-	fn_render: FR,
+	pub shader_loader: Arc<vpb::ShaderLoader<'a>>,
 }
 
-impl<FO, FC, FR> Program<FO, FC, FR>
-where
-FO: Fn(&mut Box<Scene>) + 'static,
-FC: Fn(&mut Box<Scene>) + 'static,
-FR: Fn(&mut Box<Scene>) + 'static {
+impl<'a> Program<'a> {
 	pub fn new(
 		name: &str,
-		fn_open: FO,
-		fn_close: FC,
-		fn_render: FR,
 	) -> Self {
 		let window = vpb::Window::new(
 			name,
@@ -40,17 +28,17 @@ FR: Fn(&mut Box<Scene>) + 'static {
 			&instance,
 			&window,
 		);
-		let device = vpb::Device::new(
+		let mut device = vpb::Device::new(
 			&instance,
 			&surface,
 		);
 		let swapchain = vpb::Swapchain::new(
 			&instance,
 			&window,
-			&surace,
+			&surface,
 			&device,
 		);
-		let command_pool = vpb::CommandPool::new(
+		let mut command_pool = vpb::CommandPool::new(
 			&device,
 		);
 		let command_buffer = vpb::CommandBuffer::new(
@@ -62,50 +50,60 @@ FR: Fn(&mut Box<Scene>) + 'static {
 			&device,
 			&swapchain,
 		);
-		let shader_loader = Arc::new(vpb::ShaderLoader::new());
+		let shader_loader = vpb::ShaderLoader::new();
 		let scene = Scene::new(
-			&device,
+			device,
+			command_buffer,
+			renderpass,
+			&surface,
+			swapchain,
 			&window,
-			&renderpass,
 			&shader_loader,
+			window.extent,
 		);
 		Self {
 			instance,
-			window,
 			surface,
+			window,
 			scene: Box::new(scene),
 			shader_loader,
-			fn_open,
-			fn_close,
-			fn_render,
 		}
 	}
 
-	pub fn run(
+	pub fn run<FO, FC, FR>(
 		self,
-	) {
+		fn_open: FO,
+		fn_close: FC,
+		fn_render: FR,
+	) where
+	FO: Fn(&mut Box<Scene>) + 'static,
+	FC: Fn(&mut Box<Scene>) + 'static,
+	FR: Fn(&mut Box<Scene>) + 'static {
 		let mut c_scene = self.scene;
+		fn_open(&mut c_scene);
 		self.window.event_loop.run(
 			move |event: Event<()>, _, control_flow: &mut ControlFlow| {
 				*control_flow = ControlFlow::Poll;
-				Program::<FO, FC, FR>::event_match(
+				Program::event_match(
 					&event,
 					control_flow,
 					&mut c_scene,
-					&self.fn_render,
-					&self.fn_close,
+					&fn_render,
+					&fn_close,
 				);
 			}
 		);
 	}
 
-	fn event_match(
+	fn event_match<FC, FR>(
 		event: &Event<()>,
 		control_flow: &mut ControlFlow,
 		scene: &mut Box<Scene>,
 		fn_render: &FR,
 		fn_close: &FC,
-	) {
+	) where
+	FC: Fn(&mut Box<Scene>) + 'static,
+	FR: Fn(&mut Box<Scene>) + 'static {
 		match event {
 			Event::WindowEvent {
 				event:
@@ -123,6 +121,7 @@ FR: Fn(&mut Box<Scene>) + 'static {
 			} => {
 				*control_flow = ControlFlow::Exit;
 				fn_close(scene);
+				scene.idle();
 			},
 			Event::MainEventsCleared => {
 				fn_render(scene);

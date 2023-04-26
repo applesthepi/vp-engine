@@ -1,37 +1,39 @@
 mod bucket;
 
+use std::sync::Arc;
+
 use ash::vk;
 pub use bucket::*;
 
 use crate::{VertexUI, PipelineSimple};
 
 pub struct Scene {
-	device: vpb::Device,
+	pub device: vpb::Device,
 	command_buffer: vpb::CommandBuffer,
 	render_pass: vpb::RenderPass,
 	swapchain: vpb::Swapchain,
-	window: vpb::Window,
 	buckets: Vec<Box<Bucket>>,
 	semaphore_wait: vk::Semaphore,
 	semaphore_signal: vk::Semaphore,
 	framebuffers: Vec<vk::Framebuffer>,
+	extent: vk::Extent2D,
 }
 
 impl Scene {
 	pub fn new(
 		device: vpb::Device,
 		command_buffer: vpb::CommandBuffer,
-		render_pass: vpb::RenderPass,
+		renderpass: vpb::RenderPass,
 		surface: &vpb::Surface,
 		swapchain: vpb::Swapchain,
-		window: vpb::Window,
-		renderpass: &vpb::RenderPass,
+		window: &vpb::Window,
 		shader_loader: &Arc<vpb::ShaderLoader>,
+		extent: vk::Extent2D,
 	) -> Self { unsafe {
 		let pipeline_simple = PipelineSimple::<VertexUI>::new(
 			&device,
-			&window,
-			renderpass,
+			window,
+			&renderpass,
 			shader_loader,
 		);
 		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
@@ -51,11 +53,11 @@ impl Scene {
 		let present_images = swapchain.swapchain_loader.get_swapchain_images(
 			swapchain.swapchain,
 		).unwrap();
-		let present_image_views = present_images.iter().map(
+		let present_image_views: Vec<vk::ImageView> = present_images.iter().map(
 			|image| {
 				let image_view_info = vk::ImageViewCreateInfo::builder()
 					.view_type(vk::ImageViewType::TYPE_2D)
-					.format(device.surface_format)
+					.format(device.surface_format.format)
 					.components(
 						vk::ComponentMapping {
 							r: vk::ComponentSwizzle::R,
@@ -73,18 +75,18 @@ impl Scene {
 							layer_count: 1,
 						}
 					)
-					.image(image)
+					.image(*image)
 					.build();
 				device.device.create_image_view(
 					&image_view_info,
 					None,
-				).unwrap();
+				).unwrap()
 			}
 		).collect();
 		let depth_image_info = vk::ImageCreateInfo::builder()
 			.image_type(vk::ImageType::TYPE_2D)
 			.format(vk::Format::D16_UNORM)
-			.extent(window.extent)
+			.extent(window.extent.into())
 			.mip_levels(1)
 			.array_layers(1)
 			.samples(vk::SampleCountFlags::TYPE_1)
@@ -114,9 +116,9 @@ impl Scene {
 		).unwrap();
 		let framebuffers = present_image_views.iter().map(
 			|image_view| {
-				let framebuffer_attachments = [image_view, depth_image_view];
+				let framebuffer_attachments = [*image_view, depth_image_view];
 				let frame_buffer_info = vk::FramebufferCreateInfo::builder()
-					.render_pass(render_pass.renderpass)
+					.render_pass(renderpass.renderpass)
 					.attachments(&framebuffer_attachments)
 					.width(window.extent.width)
 					.height(window.extent.height)
@@ -131,13 +133,13 @@ impl Scene {
 		Self {
 			device,
 			command_buffer,
-			render_pass,
+			render_pass: renderpass,
 			swapchain,
-			window,
 			buckets,
 			semaphore_wait,
 			semaphore_signal,
 			framebuffers,
+			extent: window.extent,
 		}
 	}}
 
@@ -154,6 +156,12 @@ impl Scene {
 	pub fn render(
 		&mut self,
 	) { unsafe {
+		let present_index = self.swapchain.swapchain_loader.acquire_next_image(
+			self.swapchain.swapchain,
+			std::u64::MAX,
+			self.semaphore_signal,
+			vk::Fence::null(),
+		).unwrap().0 as usize;
 		self.device.device.wait_for_fences(
 			&[self.command_buffer.fence_submit],
 			true,
@@ -169,12 +177,6 @@ impl Scene {
 		let command_buffer_begin_info = vk::CommandBufferBeginInfo::builder()
 			.flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
 			.build();
-		let present_index = self.swapchain.swapchain_loader.acquire_next_image(
-			self.swapchain.swapchain,
-			std::u64::MAX,
-			self.semaphore_signal,
-			vk::Fence::null(),
-		).unwrap().0 as usize;
 		self.device.device.begin_command_buffer(
 			self.command_buffer.command_buffer,
 			&command_buffer_begin_info,
@@ -182,7 +184,7 @@ impl Scene {
 		let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
 			.render_pass(self.render_pass.renderpass)
 			.framebuffer(self.framebuffers[present_index])
-			.render_area(self.window.extent.into())
+			.render_area(self.extent.into())
 			.clear_values(
 				&[
 					vk::ClearValue {
@@ -203,13 +205,13 @@ impl Scene {
 			self.command_buffer.command_buffer,
 			&render_pass_begin_info,
 			vk::SubpassContents::INLINE,
-		).unwrap();
+		);
 		for bucket in self.buckets.iter_mut() {
 			self.device.device.cmd_bind_pipeline(
-				self.command_buffer,
+				self.command_buffer.command_buffer,
 				vk::PipelineBindPoint::GRAPHICS,
-				bucket.pipeline,
-			).unwrap();
+				bucket.pipeline.get_pipeline(),
+			);
 			self.device.device.cmd_set_viewport(
 				self.command_buffer.command_buffer,
 				0,
@@ -220,22 +222,42 @@ impl Scene {
 				0,
 				&bucket.pipeline.get_scissor(),
 			);
-			bucket.render();
+			bucket.render(
+				&self.device,
+				self.command_buffer.command_buffer,
+			);
 		}
+		self.device.device.cmd_end_render_pass(
+			self.command_buffer.command_buffer,
+		);
 		self.device.device.end_command_buffer(
 			self.command_buffer.command_buffer,
 		).unwrap();
 		let command_buffers = vec![self.command_buffer.command_buffer];
 		let submit_info = vk::SubmitInfo::builder()
-			.wait_semaphores(self.semaphore_wait)
+			.wait_semaphores(&[self.semaphore_wait])
 			.wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
 			.command_buffers(&command_buffers)
-			.signal_semaphores(self.semaphore_signal)
+			.signal_semaphores(&[self.semaphore_signal])
 			.build();
 		self.device.device.queue_submit(
 			self.command_buffer.present_queue,
 			&[submit_info],
 			self.command_buffer.fence_submit,
 		).unwrap();
+		let present_info = vk::PresentInfoKHR::builder()
+			.wait_semaphores(&[self.semaphore_wait])
+			.swapchains(&[self.swapchain.swapchain])
+			.image_indices(&[present_index as u32])
+			.build();
+		self.swapchain.swapchain_loader.queue_present(
+			self.command_buffer.present_queue,
+			&present_info,
+		).unwrap();
+	}}
+	pub fn idle(
+		&self,
+	) { unsafe {
+		self.device.device.device_wait_idle().unwrap();
 	}}
 }

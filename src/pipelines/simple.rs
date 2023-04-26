@@ -39,11 +39,14 @@ impl<V: vpb::Vertex> PipelineSimple<V> {
 	}
 }
 
-impl<V: Vertex> vpb::Pipeline for PipelineSimple<V> {
+impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
 	fn get_viewport(&self) -> [vk::Viewport; 1] {
 		self.viewport
 	}
 	fn get_scissor(&self) -> [vk::Rect2D; 1] {
 		self.scissor
+	}
+	fn get_pipeline(&self) -> vk::Pipeline {
+		self.pipeline
 	}
 }

@@ -48,7 +48,7 @@ pub fn create_graphics_pipeline<V: vpb::Vertex>(
 	shader_loader: &Arc<vpb::ShaderLoader>,
 	shader_name: &str,
 	pipeline_info: PipelineInfo,
-) -> vk::Pipeline {
+) -> (vk::Pipeline, [vk::Viewport; 1], [vk::Rect2D; 1]) {
 	let sm_vert = load_shader(
 		device,
 		shader_loader,
