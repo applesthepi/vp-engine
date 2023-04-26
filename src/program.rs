@@ -44,7 +44,6 @@ impl<'a> Program<'a> {
 		let command_buffer = vpb::CommandBuffer::new(
 			&mut device,
 			&mut command_pool,
-			&swapchain,
 		);
 		let renderpass = vpb::RenderPass::new(
 			&device,
