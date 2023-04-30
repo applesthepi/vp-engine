@@ -30,8 +30,8 @@ pub fn create_viewport(
 		.y(0.0)
 		.width(window.extent.width as f32)
 		.height(window.extent.height as f32)
-		.min_depth(depths[0])
-		.max_depth(depths[1])
+		.min_depth(0.0)
+		.max_depth(1.0)
 		.build()
 }
 

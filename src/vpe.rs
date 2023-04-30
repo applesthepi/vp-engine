@@ -1,3 +1,5 @@
+#![feature(get_mut_unchecked)]
+
 mod program;
 pub use program::*;
 mod scene;

@@ -1,23 +1,30 @@
-use std::sync::Arc;
+use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow};
 
-use winit::{event_loop::ControlFlow, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}};
+use ash::vk::Instance;
+use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}};
 
 use crate::Scene;
 
 pub struct Program<'a> {
-	pub instance: vpb::Instance,
-	pub surface: vpb::Surface,
-	pub window: vpb::Window,
-	pub scene: Box<Scene>,
-	pub shader_loader: Arc<vpb::ShaderLoader<'a>>,
+	pub scene: Arc<Scene<'a>>,
+	pub data: Arc<ProgramData>,
 }
 
-impl<'a> Program<'a> {
+pub struct ProgramData {
+	pub instance: vpb::Instance,
+	pub surface: vpb::Surface,
+	pub command_pool: vpb::CommandPool,
+	pub window: vpb::Window,
+}
+
+impl<'b: 'a, 'a> Program<'a> {
 	pub fn new(
 		name: &str,
+		event_loop: &EventLoop<()>,
 	) -> Self {
-		let window = vpb::Window::new(
+		let mut window = vpb::Window::new(
 			name,
+			event_loop,
 		);
 		let instance = vpb::Instance::new(
 			name,
@@ -34,7 +41,7 @@ impl<'a> Program<'a> {
 		);
 		let swapchain = vpb::Swapchain::new(
 			&instance,
-			&window,
+			&mut window,
 			&surface,
 			&device,
 		);
@@ -54,56 +61,81 @@ impl<'a> Program<'a> {
 		let scene = Scene::new(
 			device,
 			command_buffer,
+			&mut command_pool,
 			renderpass,
 			&surface,
 			swapchain,
 			&window,
-			&shader_loader,
+			shader_loader,
 			window.extent,
 		);
-		Self {
+		let data = ProgramData {
 			instance,
 			surface,
+			command_pool,
 			window,
-			scene: Box::new(scene),
-			shader_loader,
+		};
+		Self {
+			scene: Arc::new(scene),
+			data: Arc::new(data),
 		}
 	}
 
 	pub fn run<FO, FC, FR>(
-		self,
+		mut program: Arc<ProgramData>,
+		mut scene: Arc<Scene<'static>>,
+		event_loop: EventLoop<()>,
 		fn_open: FO,
 		fn_close: FC,
 		fn_render: FR,
 	) where
-	FO: Fn(&mut Box<Scene>) + 'static,
-	FC: Fn(&mut Box<Scene>) + 'static,
-	FR: Fn(&mut Box<Scene>) + 'static {
-		let mut c_scene = self.scene;
-		fn_open(&mut c_scene);
-		self.window.event_loop.run(
+	FO: Fn(&mut Scene) + 'static,
+	FC: Fn(&mut Scene) + 'static,
+	FR: Fn(&mut Scene) + 'static { unsafe {
+		// let mut scene = self.scene.clone();
+		{
+			let scene = Arc::get_mut_unchecked(
+				&mut scene,
+			);
+			fn_open(scene);
+		}
+		// let c_program = program.clone();
+		event_loop.run(
 			move |event: Event<()>, _, control_flow: &mut ControlFlow| {
+				let program = Arc::get_mut_unchecked(
+					&mut program,
+				);
+				let scene = Arc::get_mut_unchecked(
+					&mut scene,
+				);
 				*control_flow = ControlFlow::Poll;
 				Program::event_match(
+					program,
+					scene,
 					&event,
 					control_flow,
-					&mut c_scene,
+					// &mut self,
 					&fn_render,
 					&fn_close,
 				);
 			}
 		);
-	}
+	}}
 
 	fn event_match<FC, FR>(
+		// program: Rc<Program>,
+		program: &mut ProgramData,
+		scene: &mut Scene<'a>,
+		// mut self,
 		event: &Event<()>,
 		control_flow: &mut ControlFlow,
-		scene: &mut Box<Scene>,
+		// scene: &mut Arc<Scene>,
+		// program
 		fn_render: &FR,
 		fn_close: &FC,
 	) where
-	FC: Fn(&mut Box<Scene>) + 'static,
-	FR: Fn(&mut Box<Scene>) + 'static {
+	FC: Fn(&mut Scene) + 'static,
+	FR: Fn(&mut Scene) + 'static { unsafe {
 		match event {
 			Event::WindowEvent {
 				event:
@@ -123,11 +155,23 @@ impl<'a> Program<'a> {
 				fn_close(scene);
 				scene.idle();
 			},
+			Event::WindowEvent {
+				event: WindowEvent::Resized(size),
+				..
+			} => {
+				scene.resize(
+					&program.instance,
+					&mut program.window,
+					&program.surface,
+					&mut program.command_pool,
+					[size.width, size.height],
+				);
+			}
 			Event::MainEventsCleared => {
 				fn_render(scene);
 				scene.render();
 			},
 			_ => {},
 		}
-	}
+	}}
 }

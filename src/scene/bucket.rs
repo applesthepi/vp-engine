@@ -46,6 +46,21 @@ impl Bucket {
 		device: &vpb::Device,
 		command_buffer: vk::CommandBuffer,
 	) { unsafe {
+		device.device.cmd_bind_pipeline(
+			command_buffer,
+			vk::PipelineBindPoint::GRAPHICS,
+			self.pipeline.get_pipeline(),
+		);
+		device.device.cmd_set_viewport(
+			command_buffer,
+			0,
+			&self.pipeline.get_viewport(),
+		);
+		device.device.cmd_set_scissor(
+			command_buffer,
+			0,
+			&self.pipeline.get_scissor(),
+		);
 		for object in self.objects.iter() {
 			let vertex_buffer = object.vertex_buffer();
 			let index_buffer = object.index_buffer();
