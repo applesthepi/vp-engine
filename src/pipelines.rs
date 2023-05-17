@@ -4,17 +4,18 @@ use std::sync::Arc;
 use ash::vk::{self, ShaderStageFlags};
 use shaderc::ShaderKind;
 pub use simple::*;
-use vpb::{load_shader, create_stage_infos};
+use vpb::{load_shader, create_stage_infos, BlockState};
 
 pub enum ViewportDepthRange {
 	UI,
 	WORLD,
 }
 
-pub struct PipelineInfo {
+pub struct PipelineInfo<'a> {
 	pub depth: bool,
 	pub viewport_depth_range: ViewportDepthRange,
 	pub polygon_mode: vk::PolygonMode,
+	pub block_states: &'a Vec<BlockState>,
 }
 
 pub fn create_viewport(
@@ -48,7 +49,7 @@ pub fn create_graphics_pipeline<V: vpb::Vertex>(
 	shader_loader: &Arc<vpb::ShaderLoader>,
 	shader_name: &str,
 	pipeline_info: PipelineInfo,
-) -> (vk::Pipeline, [vk::Viewport; 1], [vk::Rect2D; 1]) {
+) -> (vk::Pipeline, vk::PipelineLayout, [vk::Viewport; 1], [vk::Rect2D; 1]) {
 	let sm_vert = load_shader(
 		device,
 		shader_loader,
@@ -88,7 +89,7 @@ fn create_pipeline<V: vpb::Vertex>(
 	renderpass: &vpb::RenderPass,
 	stages: &[vk::PipelineShaderStageCreateInfo],
 	pipeline_info: PipelineInfo,
-) -> (vk::Pipeline, [vk::Viewport; 1], [vk::Rect2D; 1]) { unsafe {
+) -> (vk::Pipeline, vk::PipelineLayout, [vk::Viewport; 1], [vk::Rect2D; 1]) { unsafe {
 	let binding_descriptions = [
 		vk::VertexInputBindingDescription::builder()
 			.binding(0)
@@ -144,6 +145,13 @@ fn create_pipeline<V: vpb::Vertex>(
 	let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
 		.dynamic_states(&dynamic_state)
 		.build();
+	let set_layouts: Vec<vk::DescriptorSetLayout> = pipeline_info.block_states.iter().map(
+		|x| {
+			x.layout
+		}
+	).collect();
+	let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+		.set_layouts(&set_layouts);
 	let pipeline_layout = device.device.create_pipeline_layout(
 		&vk::PipelineLayoutCreateInfo::default(),
 		None,
@@ -175,13 +183,13 @@ fn create_pipeline<V: vpb::Vertex>(
 			vk::PipelineCache::null(),
 			&[graphics_pipeline_info],
 			None,
-		).unwrap()[0], viewports, scissors)
+		).unwrap()[0], pipeline_layout, viewports, scissors)
 	} else {
 		let graphics_pipeline_info = graphics_pipeline_info.build();
 		(device.device.create_graphics_pipelines(
 			vk::PipelineCache::null(),
 			&[graphics_pipeline_info],
 			None,
-		).unwrap()[0], viewports, scissors)
+		).unwrap()[0], pipeline_layout, viewports, scissors)
 	}
 }}

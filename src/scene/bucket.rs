@@ -4,16 +4,26 @@ use ash::vk;
 
 use crate::Object;
 
-pub struct Bucket {
+pub struct Bucket<'a> {
 	pub name: String,
 	pub pipeline: Box<dyn vpb::Pipeline>,
 	objects: Vec<Arc<dyn Object>>,
+	device: &'a vpb::Device,
+	instance: &'a vpb::Instance,
+	descriptor_pool: &'a vk::DescriptorPool,
+	frame_count: usize,
+	binding: u32,
 }
 
-impl Bucket {
+impl<'a> Bucket<'a> {
 	pub fn new(
 		name: &str,
 		pipeline: Box<dyn vpb::Pipeline>,
+		device: &'a vpb::Device,
+		instance: &'a vpb::Instance,
+		descriptor_pool: &'a vk::DescriptorPool,
+		frame_count: usize,
+		binding: u32,
 	) -> Self {
 		let name = name.to_string();
 		let objects: Vec<Arc<dyn Object>> = Vec::with_capacity(1024);
@@ -21,6 +31,11 @@ impl Bucket {
 			name,
 			pipeline,
 			objects,
+			device,
+			instance,
+			descriptor_pool,
+			frame_count,
+			binding,
 		}
 	}
 
@@ -38,6 +53,18 @@ impl Bucket {
 		&mut self,
 		object: Arc<dyn Object>,
 	) {
+		unsafe {
+			let wa_object = Arc::get_mut_unchecked(
+				&mut object,
+			);
+			wa_object.setup_block_state(
+				self.device,
+				self.instance,
+				self.descriptor_pool,
+				self.frame_count,
+				self.binding,
+			);
+		}
 		self.objects.push(object);
 	}
 
@@ -45,6 +72,7 @@ impl Bucket {
 		&mut self,
 		device: &vpb::Device,
 		command_buffer: vk::CommandBuffer,
+		frame: usize,
 	) { unsafe {
 		device.device.cmd_bind_pipeline(
 			command_buffer,
@@ -60,6 +88,11 @@ impl Bucket {
 			command_buffer,
 			0,
 			&self.pipeline.get_scissor(),
+		);
+		self.pipeline.bind_blocks(
+			device,
+			&command_buffer,
+			frame,
 		);
 		for object in self.objects.iter() {
 			let vertex_buffer = object.vertex_buffer();

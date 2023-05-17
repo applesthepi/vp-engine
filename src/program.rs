@@ -1,23 +1,63 @@
-use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow};
+use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File};
 
-use ash::vk::Instance;
+use ash::vk::{Instance, self};
+use shaderc::{ShaderKind, CompileOptions};
 use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}};
 
 use crate::Scene;
 
 pub struct Program<'a> {
 	pub scene: Arc<Scene<'a>>,
-	pub data: Arc<ProgramData>,
+	pub data: ProgramData,
 }
 
+#[derive(Clone)]
 pub struct ProgramData {
-	pub instance: vpb::Instance,
-	pub surface: vpb::Surface,
-	pub command_pool: vpb::CommandPool,
-	pub window: vpb::Window,
+	window: Arc<vpb::Window>,
+	instance: Arc<vpb::Instance>,
+	surface: Arc<vpb::Surface>,
+	device: Arc<vpb::Device>,
+	swapchain: Arc<vpb::Swapchain>,
+	command_pool: Arc<vpb::CommandPool>,
+	command_buffer_setup: Arc<vpb::CommandBuffer>,
+	command_buffer_draw: Arc<vpb::CommandBuffer>,
+	shader_loader: Arc<vpb::ShaderLoader>,
 }
 
-impl<'b: 'a, 'a> Program<'a> {
+impl ProgramData {
+	pub fn window(&self) -> &mut vpb::Window {
+		vpb::gmuc!(self.window)
+	}
+	pub fn instance(&self) -> &mut vpb::Instance {
+		vpb::gmuc!(self.instance)
+	}
+	pub fn surface(&self) -> &mut vpb::Surface {
+		vpb::gmuc!(self.surface)
+	}
+	pub fn device(&self) -> &mut vpb::Device {
+		vpb::gmuc!(self.device)
+	}
+	pub fn device_vk(&self) -> &mut ash::Device {
+		&mut vpb::gmuc!(self.device).device
+	}
+	pub fn swapchain(&self) -> &mut vpb::Swapchain {
+		vpb::gmuc!(self.swapchain)
+	}
+	pub fn command_pool(&self) -> &mut vpb::CommandPool {
+		vpb::gmuc!(self.command_pool)
+	}
+	pub fn command_buffer_setup(&self) -> &mut vpb::CommandBuffer {
+		vpb::gmuc!(self.command_buffer_setup)
+	}
+	pub fn command_buffer_draw(&self) -> &mut vpb::CommandBuffer {
+		vpb::gmuc!(self.command_buffer_draw)
+	}
+	pub fn shader_loader(&self) -> &mut vpb::ShaderLoader {
+		vpb::gmuc!(self.shader_loader)
+	}
+}
+
+impl<'a> Program<'a> {
 	pub fn new(
 		name: &str,
 		event_loop: &EventLoop<()>,
@@ -48,16 +88,22 @@ impl<'b: 'a, 'a> Program<'a> {
 		let mut command_pool = vpb::CommandPool::new(
 			&device,
 		);
-		let command_buffer = vpb::CommandBuffer::new(
+		let command_buffer_draw = vpb::CommandBuffer::new(
 			&mut device,
 			&mut command_pool,
 			&swapchain,
 		);
-		let renderpass = vpb::RenderPass::new(
-			&device,
-			&swapchain,
-		);
 		let shader_loader = vpb::ShaderLoader::new();
+		let program_data = ProgramData {
+			window,
+			instance,
+			surface,
+			device,
+			swapchain,
+			command_pool,
+			command_buffer_draw,
+			shader_loader,
+		};
 		let scene = Scene::new(
 			device,
 			command_buffer,
@@ -66,6 +112,7 @@ impl<'b: 'a, 'a> Program<'a> {
 			&surface,
 			swapchain,
 			&window,
+			&instance,
 			shader_loader,
 			window.extent,
 		);
@@ -173,5 +220,55 @@ impl<'b: 'a, 'a> Program<'a> {
 			},
 			_ => {},
 		}
+	}}
+}
+
+impl ProgramData {
+	pub fn load_shader(
+		&self,
+		shader_kind: ShaderKind,
+		name: &str,
+	) -> vk::ShaderModule { unsafe {
+		let options = CompileOptions::new().unwrap();
+		let glsl_path = ("res/shaders/".to_string() + name) + match shader_kind {
+			ShaderKind::Vertex => ".vert",
+			ShaderKind::Fragment => ".frag",
+			ShaderKind::Compute => ".comp",
+			_ => { panic!("not impl"); }
+		};
+		let glsl_path = glsl_path.as_str();
+		let spv_path = ("res/shaders/".to_string() + name) + ".spv";
+		let spv_path = spv_path.as_str();
+		let mut file = File::open(glsl_path).expect(
+			format!("shader \"{}\" does not exist", glsl_path).as_str()
+		);
+		let mut text: String = String::with_capacity(1024);
+		file.read_to_string(&mut text).unwrap();
+		let binary_artifact = self.shader_loader.compiler.compile_into_spirv(
+			text.as_str(),
+			shader_kind,
+			glsl_path, "main",
+			Some(&options),
+		).expect(format!("failed to compile \"{}\"", glsl_path).as_str());
+		debug_assert_eq!(Some(&0x07230203), binary_artifact.as_binary().first());
+		// let text_artifact = shader_loader.compiler.compile_into_spirv_assembly(
+		// 	text.as_str(),
+		// 	shader_kind,
+		// 	glsl_path, "main",
+		// 	Some(&shader_loader.options),
+		// ).expect(format!("failed to compile \"{}\"", glsl_path).as_str());
+		// debug_assert!(text_artifact.as_text().starts_with("; SPIR-V\n"));
+		// let mut spv_file = File::open(spv_path).unwrap();
+		// let spv_text = read_spv(&mut spv_file).unwrap();
+	
+		let spv_text = binary_artifact.as_binary();
+	
+		let shader_info = vk::ShaderModuleCreateInfo::builder()
+			.code(spv_text)
+			.build();
+		self.device.device.create_shader_module(
+			&shader_info,
+			None,
+		).unwrap()
 	}}
 }

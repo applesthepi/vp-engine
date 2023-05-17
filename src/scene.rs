@@ -6,16 +6,13 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, PipelineSimple};
+use crate::{VertexUI, PipelineSimple, ProgramData};
 
 pub struct Scene<'a> {
-	pub device: vpb::Device,
-	pub shader_loader: Arc<vpb::ShaderLoader<'a>>,
-	command_buffer: vpb::CommandBuffer,
+	program_data: ProgramData,
 	command_buffer_setup: vpb::CommandBuffer,
 	render_pass: vpb::RenderPass,
-	swapchain: vpb::Swapchain,
-	buckets: Vec<Box<Bucket>>,
+	buckets: Vec<Box<Bucket<'a>>>,
 	semaphore_present: vk::Semaphore,
 	semaphore_render: vk::Semaphore,
 	framebuffers: Vec<vk::Framebuffer>,
@@ -26,32 +23,13 @@ pub struct Scene<'a> {
 
 impl<'a> Scene<'a> {
 	pub fn new(
-		mut device: vpb::Device,
-		command_buffer: vpb::CommandBuffer,
-		command_pool: &mut vpb::CommandPool,
-		renderpass: vpb::RenderPass,
-		surface: &vpb::Surface,
-		swapchain: vpb::Swapchain,
-		window: &vpb::Window,
-		shader_loader: Arc<vpb::ShaderLoader<'a>>,
-		extent: vk::Extent2D,
+		program_data: ProgramData,
 	) -> Self { unsafe {
 		let command_buffer_setup = vpb::CommandBuffer::new(
 			&mut device,
 			command_pool,
 			&swapchain,
 		);
-		let pipelines = Scene::create_pipelines(
-			&device,
-			window,
-			&renderpass,
-			&shader_loader,
-		);
-		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
-		buckets.push(Box::new(Bucket::new(
-			"ui",
-			Box::new(pipelines.0),
-		)));
 		let semaphore_create_info = vk::SemaphoreCreateInfo::builder().build();
 		let semaphore_present = device.device.create_semaphore(
 			&semaphore_create_info,
@@ -72,6 +50,24 @@ impl<'a> Scene<'a> {
 			window,
 			&renderpass,
 		);
+		let pipelines = Scene::create_pipelines(
+			&device,
+			instance,
+			window,
+			&renderpass,
+			&shader_loader,
+			framebuffers.len(),
+		);
+		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
+		buckets.push(Box::new(Bucket::new(
+			"ui",
+			Box::new(pipelines.0),
+			&device,
+			instance,
+			&pipelines.0.descriptor_pool,
+			framebuffers.len(),
+			2,
+		)));
 		let scene = Self {
 			device,
 			shader_loader,
@@ -129,18 +125,22 @@ impl<'a> Scene<'a> {
 	#[allow(unused_parens)]
 	pub fn create_pipelines(
 		device: &vpb::Device,
+		instance: &vpb::Instance,
 		window: &vpb::Window,
 		render_pass: &vpb::RenderPass,
 		shader_loader: &Arc<vpb::ShaderLoader>,
+		frame_count: usize,
 	) -> (
 		PipelineSimple<VertexUI>,
 	) {
 		(
 			PipelineSimple::<VertexUI>::new(
 				device,
+				instance,
 				window,
 				render_pass,
 				shader_loader,
+				frame_count,
 			),
 		)
 	}
@@ -245,6 +245,7 @@ impl<'a> Scene<'a> {
 			bucket.render(
 				&self.device,
 				self.command_buffer.command_buffer,
+				present_index,
 			);
 		}
 		self.render_pass.close(
@@ -355,6 +356,7 @@ impl<'a> Scene<'a> {
 				bucket.pipeline.get_pipeline(),
 				None,
 			);
+			bucket.pipeline.destroy_set_layouts(&self.device);
 		}
 		self.device.device.destroy_render_pass(
 			self.render_pass.renderpass,
@@ -380,9 +382,11 @@ impl<'a> Scene<'a> {
 		);
 		let pipelines = Scene::create_pipelines(
 			&self.device,
+			instance,
 			window,
 			&self.render_pass,
 			&self.shader_loader,
+			self.framebuffers.len(),
 		);
 		self.get_bucket("ui").pipeline = Box::new(pipelines.0);
 		let (

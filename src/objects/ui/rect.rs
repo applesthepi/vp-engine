@@ -1,4 +1,6 @@
-use std::sync::Arc;
+use std::{sync::Arc, intrinsics::size_of};
+
+use ash::vk;
 
 use crate::{Object, VertexUI};
 
@@ -6,6 +8,7 @@ pub struct ObjectRect {
 	name: String,
 	pub position: [f32; 2],
 	pub size: [f32; 2],
+	pub block_state: Option<vpb::BlockState>,
 	vertex_buffer: Arc<vpb::VertexBufferGO>,
 	index_buffer: Arc<vpb::IndexBufferGO>,
 }
@@ -53,6 +56,7 @@ impl ObjectRect {
 			name,
 			position,
 			size,
+			block_state: None,
 			vertex_buffer,
 			index_buffer,
 		}
@@ -72,5 +76,22 @@ impl Object for ObjectRect {
 		&self,
 	) -> Arc<dyn vpb::IndexBuffer> {
 		self.index_buffer.clone()
+	}
+	fn setup_block_state(
+		&mut self,
+		device: &vpb::Device,
+		instance: &vpb::Instance,
+		descriptor_pool: &vk::DescriptorPool,
+		frame_count: usize,
+		binding: u32,
+	) {
+		self.block_state = Some(vpb::BlockState::new(
+			device,
+			instance,
+			descriptor_pool,
+			frame_count,
+			binding,
+			size_of::<ObjectRect>(),
+		));
 	}
 }
