@@ -6,6 +6,9 @@ use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, Ke
 
 use crate::Scene;
 
+mod macros;
+pub use macros::*;
+
 pub struct Program<'a> {
 	pub scene: Arc<Scene<'a>>,
 	pub data: ProgramData,
@@ -13,48 +16,15 @@ pub struct Program<'a> {
 
 #[derive(Clone)]
 pub struct ProgramData {
-	window: Arc<vpb::Window>,
-	instance: Arc<vpb::Instance>,
-	surface: Arc<vpb::Surface>,
-	device: Arc<vpb::Device>,
-	swapchain: Arc<vpb::Swapchain>,
-	command_pool: Arc<vpb::CommandPool>,
-	command_buffer_setup: Arc<vpb::CommandBuffer>,
-	command_buffer_draw: Arc<vpb::CommandBuffer>,
-	shader_loader: Arc<vpb::ShaderLoader>,
-}
-
-impl ProgramData {
-	pub fn window(&self) -> &mut vpb::Window {
-		vpb::gmuc!(self.window)
-	}
-	pub fn instance(&self) -> &mut vpb::Instance {
-		vpb::gmuc!(self.instance)
-	}
-	pub fn surface(&self) -> &mut vpb::Surface {
-		vpb::gmuc!(self.surface)
-	}
-	pub fn device(&self) -> &mut vpb::Device {
-		vpb::gmuc!(self.device)
-	}
-	pub fn device_vk(&self) -> &mut ash::Device {
-		&mut vpb::gmuc!(self.device).device
-	}
-	pub fn swapchain(&self) -> &mut vpb::Swapchain {
-		vpb::gmuc!(self.swapchain)
-	}
-	pub fn command_pool(&self) -> &mut vpb::CommandPool {
-		vpb::gmuc!(self.command_pool)
-	}
-	pub fn command_buffer_setup(&self) -> &mut vpb::CommandBuffer {
-		vpb::gmuc!(self.command_buffer_setup)
-	}
-	pub fn command_buffer_draw(&self) -> &mut vpb::CommandBuffer {
-		vpb::gmuc!(self.command_buffer_draw)
-	}
-	pub fn shader_loader(&self) -> &mut vpb::ShaderLoader {
-		vpb::gmuc!(self.shader_loader)
-	}
+	pub window: Arc<vpb::Window>,
+	pub instance: Arc<vpb::Instance>,
+	pub surface: Arc<vpb::Surface>,
+	pub device: Arc<vpb::Device>,
+	pub swapchain: Arc<vpb::Swapchain>,
+	pub command_pool: Arc<vpb::CommandPool>,
+	pub command_buffer_setup: Arc<vpb::CommandBuffer>,
+	pub command_buffer_draw: Arc<vpb::CommandBuffer>,
+	pub shader_loader: Arc<vpb::ShaderLoader>,
 }
 
 impl<'a> Program<'a> {

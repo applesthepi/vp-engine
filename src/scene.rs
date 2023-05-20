@@ -6,11 +6,10 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, PipelineSimple, ProgramData};
+use crate::{VertexUI, PipelineSimple, ProgramData, pd_vdevice, pd_device};
 
 pub struct Scene<'a> {
 	program_data: ProgramData,
-	command_buffer_setup: vpb::CommandBuffer,
 	render_pass: vpb::RenderPass,
 	buckets: Vec<Box<Bucket<'a>>>,
 	semaphore_present: vk::Semaphore,
@@ -25,17 +24,12 @@ impl<'a> Scene<'a> {
 	pub fn new(
 		program_data: ProgramData,
 	) -> Self { unsafe {
-		let command_buffer_setup = vpb::CommandBuffer::new(
-			&mut device,
-			command_pool,
-			&swapchain,
-		);
 		let semaphore_create_info = vk::SemaphoreCreateInfo::builder().build();
-		let semaphore_present = device.device.create_semaphore(
+		let semaphore_present = pd_vdevice!(program_data).create_semaphore(
 			&semaphore_create_info,
 			None,
 		).unwrap();
-		let semaphore_render = device.device.create_semaphore(
+		let semaphore_render = pd_vdevice!(program_data).create_semaphore(
 			&semaphore_create_info,
 			None,
 		).unwrap();
@@ -90,18 +84,16 @@ impl<'a> Scene<'a> {
 	}}
 
 	pub fn create_framebuffers(
-		device: &vpb::Device,
-		swapchain: &vpb::Swapchain,
-		window: &vpb::Window,
+		program_data: &ProgramData,
 		renderpass: &vpb::RenderPass,
 	) -> (Vec<vk::Framebuffer>, Vec<vk::ImageView>, vk::ImageView, vk::Image) { unsafe {
 		let (present_images, present_image_views) = create_presentation_images(
-			&device,
-			&swapchain,
+			&program_data.device,
+			&program_data.swapchain,
 		);
 		let (depth_image, depth_image_view) = create_depth_image(
-			&device,
-			window,
+			&program_data.device,
+			&program_data.window,
 		);
 		let framebuffers = present_image_views.iter().map(
 			|image_view| {
@@ -109,11 +101,11 @@ impl<'a> Scene<'a> {
 				let frame_buffer_info = vk::FramebufferCreateInfo::builder()
 					.render_pass(renderpass.renderpass)
 					.attachments(&framebuffer_attachments)
-					.width(window.extent.width)
-					.height(window.extent.height)
+					.width(program_data.window.extent.width)
+					.height(program_data.window.extent.height)
 					.layers(1)
 					.build();
-				device.device.create_framebuffer(
+				pd_vdevice!(program_data).create_framebuffer(
 					&frame_buffer_info,
 					None,
 				).unwrap()
