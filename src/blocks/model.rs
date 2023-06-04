@@ -7,12 +7,11 @@ use crate::ProgramData;
 
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
-pub struct BlockCamera {
-	pub view: [f32; 16],
-	pub projection: [f32; 16],
+pub struct BlockModel {
+	pub model: [f32; 16],
 }
 
-impl BlockCamera {
+impl BlockModel {
 	pub fn create_block_state(
 		program_data: &ProgramData,
 		descriptor_pool: &vk::DescriptorPool,
@@ -27,17 +26,18 @@ impl BlockCamera {
 			descriptor_set_layout,
 			program_data.frame_count,
 			binding,
-			set,
-			size_of::<BlockCamera>(),
-			1,
+            set,
+			size_of::<BlockModel>(),
+            1,
 		);
 		block_state
 	}
+
 	pub fn create_descriptor_set_layout(
 		device: &Arc<vpb::Device>,
 	) -> vk::DescriptorSetLayout { unsafe {
 		let descriptor_set_layout_binding = vk::DescriptorSetLayoutBinding::builder()
-			.binding(0)
+			.binding(1)
 			.descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
 			.stage_flags(vk::ShaderStageFlags::VERTEX)
 			.descriptor_count(1)

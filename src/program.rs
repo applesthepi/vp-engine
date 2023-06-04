@@ -1,4 +1,4 @@
-use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File};
+use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File, io::Read};
 
 use ash::vk::{Instance, self};
 use shaderc::{ShaderKind, CompileOptions};
@@ -9,9 +9,9 @@ use crate::Scene;
 mod macros;
 pub use macros::*;
 
-pub struct Program<'a> {
-	pub scene: Arc<Scene<'a>>,
-	pub data: ProgramData,
+pub struct Program {
+	pub scene: Arc<Scene>,
+	pub program_data: ProgramData,
 }
 
 #[derive(Clone)]
@@ -25,9 +25,10 @@ pub struct ProgramData {
 	pub command_buffer_setup: Arc<vpb::CommandBuffer>,
 	pub command_buffer_draw: Arc<vpb::CommandBuffer>,
 	pub shader_loader: Arc<vpb::ShaderLoader>,
+	pub frame_count: usize,
 }
 
-impl<'a> Program<'a> {
+impl Program {
 	pub fn new(
 		name: &str,
 		event_loop: &EventLoop<()>,
@@ -63,44 +64,37 @@ impl<'a> Program<'a> {
 			&mut command_pool,
 			&swapchain,
 		);
-		let shader_loader = vpb::ShaderLoader::new();
-		let program_data = ProgramData {
-			window,
-			instance,
-			surface,
-			device,
-			swapchain,
-			command_pool,
-			command_buffer_draw,
-			shader_loader,
-		};
-		let scene = Scene::new(
-			device,
-			command_buffer,
+		let command_buffer_setup = vpb::CommandBuffer::new(
+			&mut device,
 			&mut command_pool,
-			renderpass,
-			&surface,
-			swapchain,
-			&window,
-			&instance,
-			shader_loader,
-			window.extent,
+			&swapchain,
 		);
-		let data = ProgramData {
-			instance,
-			surface,
-			command_pool,
-			window,
+		let shader_loader = vpb::ShaderLoader::new();
+		let mut program_data = ProgramData {
+			window: Arc::new(window),
+			instance: Arc::new(instance),
+			surface: Arc::new(surface),
+			device: Arc::new(device),
+			swapchain: Arc::new(swapchain),
+			command_pool: Arc::new(command_pool),
+			command_buffer_draw: Arc::new(command_buffer_draw),
+			command_buffer_setup: Arc::new(command_buffer_setup),
+			shader_loader: Arc::new(shader_loader),
+			frame_count: 0,
 		};
+		let (scene, frame_count) = Scene::new(
+			program_data.clone(),
+		);
+		program_data.frame_count = frame_count;
 		Self {
 			scene: Arc::new(scene),
-			data: Arc::new(data),
+			program_data,
 		}
 	}
 
 	pub fn run<FO, FC, FR>(
-		mut program: Arc<ProgramData>,
-		mut scene: Arc<Scene<'static>>,
+		mut program_data: Arc<ProgramData>,
+		mut scene: Arc<Scene>,
 		event_loop: EventLoop<()>,
 		fn_open: FO,
 		fn_close: FC,
@@ -120,7 +114,7 @@ impl<'a> Program<'a> {
 		event_loop.run(
 			move |event: Event<()>, _, control_flow: &mut ControlFlow| {
 				let program = Arc::get_mut_unchecked(
-					&mut program,
+					&mut program_data,
 				);
 				let scene = Arc::get_mut_unchecked(
 					&mut scene,
@@ -141,8 +135,8 @@ impl<'a> Program<'a> {
 
 	fn event_match<FC, FR>(
 		// program: Rc<Program>,
-		program: &mut ProgramData,
-		scene: &mut Scene<'a>,
+		program_data: &mut ProgramData,
+		scene: &mut Scene,
 		// mut self,
 		event: &Event<()>,
 		control_flow: &mut ControlFlow,
@@ -177,10 +171,10 @@ impl<'a> Program<'a> {
 				..
 			} => {
 				scene.resize(
-					&program.instance,
-					&mut program.window,
-					&program.surface,
-					&mut program.command_pool,
+					&program_data.instance,
+					pd_window!(program_data),
+					&program_data.surface,
+					pd_command_pool!(program_data),
 					[size.width, size.height],
 				);
 			}

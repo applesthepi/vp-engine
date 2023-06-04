@@ -1,16 +1,14 @@
-use std::{sync::Arc, intrinsics::size_of};
+use std::{sync::Arc, intrinsics::size_of, cell::{RefCell, OnceCell}};
 
 use ash::vk;
+use nalgebra::{Matrix4, Isometry2, Vector2, vector, Isometry3};
 
-use crate::{Object, VertexUI};
+use crate::{Object, VertexUI, BlockModel, ProgramData, BlockCamera, simple, ObjectState, ObjectStateBuffers};
 
 pub struct ObjectRect {
-	name: String,
+	state: Arc<ObjectState>,
 	pub position: [f32; 2],
 	pub size: [f32; 2],
-	pub block_state: Option<vpb::BlockState>,
-	vertex_buffer: Arc<vpb::VertexBufferGO>,
-	index_buffer: Arc<vpb::IndexBufferGO>,
 }
 
 impl ObjectRect {
@@ -52,46 +50,44 @@ impl ObjectRect {
 			device,
 			&indices,
 		));
-		Self {
+		let state = Arc::new(ObjectState {
 			name,
+			block_states: None,
+			buffers: ObjectStateBuffers::GO(vertex_buffer, index_buffer),
+		});
+		Self {
+			state,
 			position,
 			size,
-			block_state: None,
-			vertex_buffer,
-			index_buffer,
 		}
 	}
 }
 
 impl Object for ObjectRect {
-	fn name(&self) -> &String {
-		&self.name
+	fn state(&self) -> Arc<ObjectState> {
+		self.state.clone()
 	}
-	fn vertex_buffer(
+	fn update_block_states(
 		&self,
-	) -> Arc<dyn vpb::VertexBuffer> {
-		self.vertex_buffer.clone()
-	}
-	fn index_buffer(
-		&self,
-	) -> Arc<dyn vpb::IndexBuffer> {
-		self.index_buffer.clone()
-	}
-	fn setup_block_state(
-		&mut self,
 		device: &vpb::Device,
-		instance: &vpb::Instance,
-		descriptor_pool: &vk::DescriptorPool,
-		frame_count: usize,
-		binding: u32,
+		command_buffer: &vk::CommandBuffer,
+		frame: usize,
 	) {
-		self.block_state = Some(vpb::BlockState::new(
-			device,
-			instance,
-			descriptor_pool,
-			frame_count,
-			binding,
-			size_of::<ObjectRect>(),
-		));
+		let matrix = Isometry3::<f32>::new(
+			vector![0.0, 0.0, 0.0],
+			vector![0.0, 0.0, 0.0],
+		).to_matrix();
+		let model = BlockModel {
+			model: matrix.as_slice().try_into().unwrap(),
+		};
+		if let Some(block_state) = self.state.block_states.as_ref() {
+			block_state[1].update(
+				device,
+				command_buffer,
+				&model,
+				Some(frame),
+			);
+			println!("updating rect");
+		}
 	}
 }

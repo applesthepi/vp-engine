@@ -6,85 +6,79 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, PipelineSimple, ProgramData, pd_vdevice, pd_device};
+use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple};
 
-pub struct Scene<'a> {
+pub struct Scene {
 	program_data: ProgramData,
 	render_pass: vpb::RenderPass,
-	buckets: Vec<Box<Bucket<'a>>>,
+	buckets: Vec<Box<Bucket>>,
 	semaphore_present: vk::Semaphore,
 	semaphore_render: vk::Semaphore,
 	framebuffers: Vec<vk::Framebuffer>,
 	framebuffer_imageviews: Vec<vk::ImageView>,
-	extent: vk::Extent2D,
 	depth_image_view: vk::ImageView,
 }
 
-impl<'a> Scene<'a> {
+impl Scene {
 	pub fn new(
-		program_data: ProgramData,
-	) -> Self { unsafe {
+		mut program_data: ProgramData,
+	) -> (Self, usize) { unsafe {
 		let semaphore_create_info = vk::SemaphoreCreateInfo::builder().build();
-		let semaphore_present = pd_vdevice!(program_data).create_semaphore(
+		let semaphore_present = program_data.device.device.create_semaphore(
 			&semaphore_create_info,
 			None,
 		).unwrap();
-		let semaphore_render = pd_vdevice!(program_data).create_semaphore(
+		let semaphore_render = program_data.device.device.create_semaphore(
 			&semaphore_create_info,
 			None,
 		).unwrap();
+		let render_pass = vpb::RenderPass::new(
+			&program_data.device,
+			&program_data.swapchain,
+		);
 		let (
 			framebuffers,
 			present_image_views,
 			depth_image_view,
 			depth_image,
 		) = Scene::create_framebuffers(
-			&device,
-			&swapchain,
-			window,
-			&renderpass,
+			&mut program_data,
+			&render_pass,
 		);
+		program_data.frame_count = framebuffers.len();
 		let pipelines = Scene::create_pipelines(
-			&device,
-			instance,
-			window,
-			&renderpass,
-			&shader_loader,
-			framebuffers.len(),
+			&program_data,
+			&render_pass,
 		);
 		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
+		let pipeline_ui = Arc::new(pipelines.0);
+		let pipeline_ui_engine = pipeline_ui.clone();
 		buckets.push(Box::new(Bucket::new(
 			"ui",
-			Box::new(pipelines.0),
-			&device,
-			instance,
-			&pipelines.0.descriptor_pool,
-			framebuffers.len(),
+			pipeline_ui,
+			pipeline_ui_engine,
+			program_data.clone(),
 			2,
 		)));
+		let frame_count = program_data.frame_count;
 		let scene = Self {
-			device,
-			shader_loader,
-			command_buffer,
-			command_buffer_setup,
-			render_pass: renderpass,
-			swapchain,
+			program_data,
+			render_pass,
 			buckets,
 			semaphore_present,
 			semaphore_render,
 			framebuffers,
 			framebuffer_imageviews: present_image_views,
-			extent: window.extent,
 			depth_image_view,
 		};
 		scene.setup_submit(
 			&depth_image
 		);
-		scene
+		(scene, frame_count)
 	}}
 
 	pub fn create_framebuffers(
-		program_data: &ProgramData,
+		program_data: &mut ProgramData,
 		renderpass: &vpb::RenderPass,
 	) -> (Vec<vk::Framebuffer>, Vec<vk::ImageView>, vk::ImageView, vk::Image) { unsafe {
 		let (present_images, present_image_views) = create_presentation_images(
@@ -99,13 +93,14 @@ impl<'a> Scene<'a> {
 			|image_view| {
 				let framebuffer_attachments = [*image_view, depth_image_view];
 				let frame_buffer_info = vk::FramebufferCreateInfo::builder()
-					.render_pass(renderpass.renderpass)
+					.render_pass(renderpass.render_pass)
 					.attachments(&framebuffer_attachments)
 					.width(program_data.window.extent.width)
 					.height(program_data.window.extent.height)
 					.layers(1)
 					.build();
-				pd_vdevice!(program_data).create_framebuffer(
+				
+				program_data.device.device.create_framebuffer(
 					&frame_buffer_info,
 					None,
 				).unwrap()
@@ -116,23 +111,15 @@ impl<'a> Scene<'a> {
 
 	#[allow(unused_parens)]
 	pub fn create_pipelines(
-		device: &vpb::Device,
-		instance: &vpb::Instance,
-		window: &vpb::Window,
+		program_data: &ProgramData,
 		render_pass: &vpb::RenderPass,
-		shader_loader: &Arc<vpb::ShaderLoader>,
-		frame_count: usize,
 	) -> (
 		PipelineSimple<VertexUI>,
 	) {
 		(
 			PipelineSimple::<VertexUI>::new(
-				device,
-				instance,
-				window,
+				program_data,
 				render_pass,
-				shader_loader,
-				frame_count,
 			),
 		)
 	}
@@ -151,12 +138,12 @@ impl<'a> Scene<'a> {
 		&self,
 		command_buffer: &vpb::CommandBuffer,
 	) { unsafe {
-		self.device.device.wait_for_fences(
+		self.program_data.device.device.wait_for_fences(
 			&[command_buffer.fence_submit],
 			true,
 			std::u64::MAX,
 		).unwrap();
-		self.device.device.reset_fences(
+		self.program_data.device.device.reset_fences(
 			&[command_buffer.fence_submit],
 		).unwrap();
 	}}
@@ -164,8 +151,8 @@ impl<'a> Scene<'a> {
 	pub fn acquire_next_image(
 		&self,
 	) -> usize { unsafe {
-		self.swapchain.swapchain_loader.acquire_next_image(
-			self.swapchain.swapchain,
+		self.program_data.swapchain.swapchain_loader.acquire_next_image(
+			self.program_data.swapchain.swapchain,
 			std::u64::MAX,
 			self.semaphore_present,
 			vk::Fence::null(),
@@ -177,10 +164,10 @@ impl<'a> Scene<'a> {
 		depth_image: &vk::Image,
 	) { unsafe {
 		self.sync_fences(
-			&self.command_buffer_setup,
+			&self.program_data.command_buffer_setup,
 		);
-		self.command_buffer_setup.open(
-			&self.device
+		self.program_data.command_buffer_setup.open(
+			&self.program_data.device
 		);
 		let layout_transition_barriers = vk::ImageMemoryBarrier::builder()
 			.image(*depth_image)
@@ -198,8 +185,8 @@ impl<'a> Scene<'a> {
 					.level_count(1)
 					.build()
 			).build();
-		self.device.device.cmd_pipeline_barrier(
-			self.command_buffer_setup.command_buffer,
+		self.program_data.device.device.cmd_pipeline_barrier(
+			self.program_data.command_buffer_setup.command_buffer,
 			vk::PipelineStageFlags::BOTTOM_OF_PIPE,
 			vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
 			vk::DependencyFlags::empty(),
@@ -207,11 +194,11 @@ impl<'a> Scene<'a> {
 			&[],
 			&[layout_transition_barriers],
 		);
-		self.command_buffer_setup.close(
-			&self.device,
+		self.program_data.command_buffer_setup.close(
+			&self.program_data.device,
 		);
 		self.submit(
-			&self.command_buffer_setup,
+			&self.program_data.command_buffer_setup,
 			false,
 		);
 		self.idle();
@@ -222,33 +209,40 @@ impl<'a> Scene<'a> {
 	) { unsafe {
 		let present_index = self.acquire_next_image();
 		self.sync_fences(
-			&self.command_buffer,
+			&self.program_data.command_buffer_draw,
 		);
-		self.command_buffer.open(
-			&self.device
+		self.program_data.command_buffer_draw.open(
+			&self.program_data.device
 		);
+		for bucket in self.buckets.iter_mut() {
+			bucket.update_blocks(
+				&self.program_data.device,
+				&self.program_data.command_buffer_draw.command_buffer,
+				present_index,
+			);
+		}
 		self.render_pass.open(
-			&self.device,
-			&self.extent,
+			&self.program_data.device,
+			&self.program_data.window.extent,
 			&self.framebuffers[present_index],
-			&self.command_buffer.command_buffer,
+			&self.program_data.command_buffer_draw.command_buffer,
 		);
 		for bucket in self.buckets.iter_mut() {
 			bucket.render(
-				&self.device,
-				self.command_buffer.command_buffer,
+				&self.program_data.device,
+				self.program_data.command_buffer_draw.command_buffer,
 				present_index,
 			);
 		}
 		self.render_pass.close(
-			&self.device,
-			&self.command_buffer,
+			&self.program_data.device,
+			&self.program_data.command_buffer_draw,
 		);
-		self.command_buffer.close(
-			&self.device,
+		self.program_data.command_buffer_draw.close(
+			&self.program_data.device,
 		);
 		self.submit(
-			&self.command_buffer,
+			&self.program_data.command_buffer_draw,
 			true,
 		);
 		self.present(present_index);
@@ -267,7 +261,7 @@ impl<'a> Scene<'a> {
 				.command_buffers(&command_buffers)
 				.signal_semaphores(&[self.semaphore_render])
 				.build();
-			self.device.device.queue_submit(
+			self.program_data.device.device.queue_submit(
 				command_buffer.present_queue,
 				&[submit_info],
 				command_buffer.fence_submit,
@@ -282,7 +276,7 @@ impl<'a> Scene<'a> {
 				.build();
 			submit_info.wait_semaphore_count = 0;
 			submit_info.signal_semaphore_count = 0;
-			self.device.device.queue_submit(
+			self.program_data.device.device.queue_submit(
 				command_buffer.present_queue,
 				&[submit_info],
 				command_buffer.fence_submit,
@@ -296,11 +290,11 @@ impl<'a> Scene<'a> {
 	) { unsafe {
 		let present_info = vk::PresentInfoKHR::builder()
 			.wait_semaphores(&[self.semaphore_render])
-			.swapchains(&[self.swapchain.swapchain])
+			.swapchains(&[self.program_data.swapchain.swapchain])
 			.image_indices(&[present_index as u32])
 			.build();
-		self.swapchain.swapchain_loader.queue_present(
-			self.command_buffer.present_queue,
+		self.program_data.swapchain.swapchain_loader.queue_present(
+			self.program_data.command_buffer_draw.present_queue,
 			&present_info,
 		).unwrap();
 	}}
@@ -308,7 +302,7 @@ impl<'a> Scene<'a> {
 	pub fn idle(
 		&self,
 	) { unsafe {
-		self.device.device.device_wait_idle().unwrap();
+		self.program_data.device.device.device_wait_idle().unwrap();
 	}}
 
 	pub fn resize(
@@ -321,90 +315,91 @@ impl<'a> Scene<'a> {
 	) { unsafe {
 		self.idle();
 		for framebuffer in self.framebuffers.iter() {
-			self.device.device.destroy_framebuffer(
+			self.program_data.device.device.destroy_framebuffer(
 				*framebuffer,
 				None,
 			);
 		}
 		for image_view in self.framebuffer_imageviews.iter() {
-			self.device.device.destroy_image_view(
+			self.program_data.device.device.destroy_image_view(
 				*image_view,
 				None,
 			);
 		}
-		self.device.device.destroy_image_view(
+		self.program_data.device.device.destroy_image_view(
 			self.depth_image_view,
 			None,
 		);
-		self.device.device.free_command_buffers(
-			command_pool.command_pool,
-			&[
-				self.command_buffer_setup.command_buffer,
-				self.command_buffer.command_buffer
-			],
-		);
-		for bucket in self.buckets.iter() {
-			self.device.device.destroy_pipeline(
-				bucket.pipeline.get_pipeline(),
-				None,
-			);
-			bucket.pipeline.destroy_set_layouts(&self.device);
-		}
-		self.device.device.destroy_render_pass(
-			self.render_pass.renderpass,
-			None,
-		);
-		self.swapchain.swapchain_loader.destroy_swapchain(
-			self.swapchain.swapchain,
+		// self.program_data.device.device.free_command_buffers(
+		// 	command_pool.command_pool,
+		// 	&[
+		// 		self.program_data.command_buffer_setup.command_buffer,
+		// 		self.program_data.command_buffer_draw.command_buffer
+		// 	],
+		// );
+		// for bucket in self.buckets.iter_mut() {
+		// 	self.program_data.device.device.destroy_pipeline(
+		// 		bucket.pipeline.get_pipeline(),
+		// 		None,
+		// 	);
+		// 	bucket.destroy_descriptor_set_layouts();
+		// }
+		// self.program_data.device.device.destroy_render_pass(
+		// 	self.render_pass.render_pass,
+		// 	None,
+		// );
+		self.program_data.swapchain.swapchain_loader.destroy_swapchain(
+			self.program_data.swapchain.swapchain,
 			None,
 		);
 		window.extent = vk::Extent2D {
 			width: size[0],
 			height: size[1],
 		};
-		self.swapchain = vpb::Swapchain::new(
+		let swapchain = vpb::Swapchain::new(
 			instance,
 			window,
 			surface,
-			&self.device,
+			&self.program_data.device,
 		);
-		self.render_pass = vpb::RenderPass::new(
-			&self.device,
-			&self.swapchain,
-		);
-		let pipelines = Scene::create_pipelines(
-			&self.device,
-			instance,
-			window,
-			&self.render_pass,
-			&self.shader_loader,
-			self.framebuffers.len(),
-		);
-		self.get_bucket("ui").pipeline = Box::new(pipelines.0);
+		// let render_pass = vpb::RenderPass::new(
+		// 	&self.program_data.device,
+		// 	&swapchain,
+		// );
+		self.program_data.swapchain = Arc::new(swapchain);
+		// let bucket_ui_program_data = self.program_data.clone();
+		// self.render_pass = render_pass;
+		// let pipelines = Scene::create_pipelines(
+		// 	&self.program_data,
+		// 	&self.render_pass,
+		// );
+		// let bucket_ui = self.get_bucket("ui");
+		// bucket_ui.pipeline = Box::new(pipelines.0);
+		// bucket_ui.program_data = bucket_ui_program_data;
 		let (
 			framebuffers,
 			present_image_views,
 			depth_image_view,
 			depth_image,
 		) = Scene::create_framebuffers(
-			&self.device,
-			&self.swapchain,
-			window,
+			&mut self.program_data,
 			&self.render_pass,
 		);
 		self.framebuffers = framebuffers;
 		self.framebuffer_imageviews = present_image_views;
 		self.depth_image_view = depth_image_view;
-		self.command_buffer_setup = vpb::CommandBuffer::new(
-			&mut self.device,
-			command_pool,
-			&self.swapchain,
-		);
-		self.command_buffer = vpb::CommandBuffer::new(
-			&mut self.device,
-			command_pool,
-			&self.swapchain,
-		);
+		// let command_buffer_setup = vpb::CommandBuffer::new(
+		// 	&mut self.program_data.device,
+		// 	command_pool,
+		// 	&self.program_data.swapchain,
+		// );
+		// let command_buffer_draw = vpb::CommandBuffer::new(
+		// 	&mut self.program_data.device,
+		// 	command_pool,
+		// 	&self.program_data.swapchain,
+		// );
+		// self.program_data.command_buffer_setup = Arc::new(command_buffer_setup);
+		// self.program_data.command_buffer_draw = Arc::new(command_buffer_draw);
 		self.setup_submit(
 			&depth_image,
 		);
