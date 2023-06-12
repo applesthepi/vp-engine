@@ -6,15 +6,14 @@ use bytemuck::{Pod, Zeroable};
 use crate::ProgramData;
 
 #[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
+#[derive(Copy, Clone)]
 pub struct BlockModel {
-	pub model: [f32; 16],
+	pub model: nalgebra_glm::Mat4,
 }
 
 impl BlockModel {
 	pub fn create_block_state(
 		program_data: &ProgramData,
-		descriptor_pool: &vk::DescriptorPool,
 		descriptor_set_layout: &vk::DescriptorSetLayout,
 		binding: u32,
 		set: u32,
@@ -22,7 +21,7 @@ impl BlockModel {
 		let block_state = vpb::BlockState::new(
 			&program_data.device,
 			&program_data.instance,
-			descriptor_pool,
+			&program_data.descriptor_pool.descriptor_pool,
 			descriptor_set_layout,
 			program_data.frame_count,
 			binding,

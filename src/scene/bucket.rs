@@ -60,7 +60,6 @@ impl Bucket {
 	pub fn update_blocks(
 		&mut self,
 		device: &vpb::Device,
-		command_buffer: &vk::CommandBuffer,
 		frame: usize,
 	) {
 		vpb::gmuc!(self.pipeline).update_blocks(
@@ -68,13 +67,12 @@ impl Bucket {
 			&self.program_data.window.extent,
 			frame,
 		);
-		// for object in self.objects.iter() {
-		// 	object.update_block_states(
-		// 		device,
-		// 		command_buffer,
-		// 		frame,
-		// 	);
-		// }
+		for object in self.objects.iter() {
+			object.update_block_states(
+				device,
+				frame,
+			);
+		}
 	}
 
 	pub fn render(
@@ -104,12 +102,11 @@ impl Bucket {
 				"attempting to bind no block states during rendering"
 			);
 			// TODO: USE
-			// let block_state_layouts: Vec<vk::DescriptorSet> = block_states.iter().map(
-			// 	|x| {
-			// 		x.descriptor_buffers[frame].set
-			// 	}
-			// ).collect();
-			let block_state_layouts: Vec<vk::DescriptorSet> = vec![block_states[0].frame_sets[frame].set];
+			let block_state_layouts: Vec<vk::DescriptorSet> = block_states.iter().map(
+				|x| {
+					x.frame_sets[frame].set
+				}
+			).collect();
 			device.device.cmd_bind_descriptor_sets(
 				command_buffer,
 				vk::PipelineBindPoint::GRAPHICS,
@@ -130,23 +127,6 @@ impl Bucket {
 				0,
 				1,
 			);
-		}
-	}}
-
-	pub fn destroy_descriptor_set_layouts(
-		&mut self,
-	) { unsafe {
-		vpb::gmuc!(self.pipeline).destroy_set_layout(&self.program_data.device);
-		for object in self.objects.iter() {
-			let object_state = object.state();
-			for block_state in object_state.block_states.as_ref().expect(
-				"attempting to destroy block states in object without any block states"
-			).iter().skip(1) {
-				self.program_data.device.device.destroy_descriptor_set_layout(
-					block_state.layout,
-					None,
-				);
-			}
 		}
 	}}
 

@@ -195,7 +195,7 @@ impl Scene {
 
 	pub fn render(
 		&mut self,
-	) { unsafe {
+	) {
 		let present_index = self.acquire_next_image();
 		self.sync_fences(
 			&self.program_data.command_buffer_draw,
@@ -206,7 +206,6 @@ impl Scene {
 		for bucket in self.buckets.iter_mut() {
 			bucket.update_blocks(
 				&self.program_data.device,
-				&self.program_data.command_buffer_draw.command_buffer,
 				present_index,
 			);
 		}
@@ -235,7 +234,7 @@ impl Scene {
 			true,
 		);
 		self.present(present_index);
-	}}
+	}
 
 	fn submit(
 		&self,

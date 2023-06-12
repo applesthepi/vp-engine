@@ -28,7 +28,7 @@ impl vpb::Vertex for VertexUI {
 				.location(1)
 				.binding(0)
 				.format(vk::Format::R32G32B32A32_SFLOAT)
-				.offset(offset_of!(VertexUI, position) as u32)
+				.offset(offset_of!(VertexUI, color) as u32)
 				.build(),
 		]
 	}

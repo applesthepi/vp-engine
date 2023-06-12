@@ -1,9 +1,6 @@
-use std::{sync::Arc, intrinsics::size_of, cell::{RefCell, OnceCell}};
+use std::sync::Arc;
 
-use ash::vk;
-use nalgebra::{Matrix4, Isometry2, Vector2, vector, Isometry3};
-
-use crate::{Object, VertexUI, BlockModel, ProgramData, BlockCamera, simple, ObjectState, ObjectStateBuffers};
+use crate::{Object, VertexUI, BlockModel, ObjectState, ObjectStateBuffers};
 
 pub struct ObjectRect {
 	state: Arc<ObjectState>,
@@ -73,20 +70,19 @@ impl Object for ObjectRect {
 		device: &vpb::Device,
 		frame: usize,
 	) {
-		let matrix = Isometry3::<f32>::new(
-			vector![0.0, 0.0, 0.0],
-			vector![0.0, 0.0, 0.0],
-		).to_matrix();
-		let model = BlockModel {
-			model: matrix.as_slice().try_into().unwrap(),
+		let model = nalgebra_glm::translate(
+			&nalgebra_glm::identity(),
+			&nalgebra_glm::vec3(50.0, 0.0, 0.0),
+		);
+		let model_block = BlockModel {
+			model,
 		};
 		if let Some(block_state) = self.state.block_states.as_ref() {
 			block_state[1].update(
 				device,
-				&model,
+				&model_block,
 				Some(frame),
 			);
-			println!("updating rect");
 		}
 	}
 }

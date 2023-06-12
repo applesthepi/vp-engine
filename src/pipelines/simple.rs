@@ -22,8 +22,12 @@ impl<V: vpb::Vertex> EnginePipeline for PipelineSimple<V> {
 		program_data: &ProgramData,
 	) -> Vec<Arc<vpb::BlockState>> {
 		vec![
-			self.block_state.clone()
-			// TODO: CREATE NEW MODEL BLOCK STATE
+			self.block_state.clone(),
+			Arc::new(BlockModel::create_block_state(
+				program_data,
+				&self.descriptor_set_layouts[1],
+				1, 1,
+			))
 		]
 	}
 
@@ -72,6 +76,7 @@ impl<V: vpb::Vertex> PipelineSimple<V> {
 	) -> Self { unsafe {
 		let mut descriptor_set_layouts = vec![
 			BlockCamera::create_descriptor_set_layout(&program_data.device),
+			BlockModel::create_descriptor_set_layout(&program_data.device),
 		];
 		let (
 			pipeline,
@@ -162,17 +167,6 @@ impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
 			&[self.block_state.frame_sets[frame].set],
 			&[],
 		);
-	}}
-	
-	fn destroy_set_layout(
-		&mut self,
-		device: &vpb::Device,
-	) { unsafe {
-		device.device.destroy_descriptor_set_layout(
-			self.block_state.layout,
-			None,
-		);
-		// TODO: bucket destroys object models.
 	}}
 	
 	fn update_blocks(
