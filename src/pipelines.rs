@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ash::vk::{self, ShaderStageFlags};
 use shaderc::ShaderKind;
-use vpb::{create_stage_infos, BlockState};
+use vpb::create_stage_infos;
 
 use crate::ProgramData;
 
@@ -13,11 +13,20 @@ pub enum ViewportDepthRange {
 }
 
 pub trait EnginePipeline {
-	fn create_block_states(
+	fn create_object_block_states(
 		&self,
 		program_data: &ProgramData,
-		descriptor_pool: &vk::DescriptorPool,
 	) -> Vec<Arc<vpb::BlockState>>;
+
+	fn recreate_block_states(
+		&mut self,
+		program_data: &ProgramData,
+	);
+	
+	fn recreate_pipeline(
+		&mut self,
+		program_data: &ProgramData,
+	);
 }
 
 pub struct PipelineInfo<'a> {
@@ -53,7 +62,6 @@ pub fn create_extent(
 
 pub fn create_graphics_pipeline<V: vpb::Vertex>(
 	program_data: &ProgramData,
-	render_pass: &vpb::RenderPass,
 	shader_name: &str,
 	pipeline_info: PipelineInfo,
 ) -> (vk::Pipeline, vk::PipelineLayout, [vk::Viewport; 1], [vk::Rect2D; 1]) {
@@ -79,7 +87,6 @@ pub fn create_graphics_pipeline<V: vpb::Vertex>(
 	);
 	create_pipeline::<V>(
 		program_data,
-		render_pass,
 		&stages,
 		pipeline_info,
 	)
@@ -87,7 +94,6 @@ pub fn create_graphics_pipeline<V: vpb::Vertex>(
 
 fn create_pipeline<V: vpb::Vertex>(
 	program_data: &ProgramData,
-	render_pass: &vpb::RenderPass,
 	stages: &[vk::PipelineShaderStageCreateInfo],
 	pipeline_info: PipelineInfo,
 ) -> (vk::Pipeline, vk::PipelineLayout, [vk::Viewport; 1], [vk::Rect2D; 1]) { unsafe {
@@ -163,7 +169,7 @@ fn create_pipeline<V: vpb::Vertex>(
 		.color_blend_state(&color_blend_state)
 		.dynamic_state(&dynamic_state_info)
 		.layout(pipeline_layout)
-		.render_pass(render_pass.render_pass);
+		.render_pass(program_data.render_pass.render_pass);
 	if pipeline_info.depth {
 		let depth_state_info = vk::PipelineDepthStencilStateCreateInfo::builder()
 			.depth_test_enable(true)

@@ -21,6 +21,8 @@ pub struct ProgramData {
 	pub surface: Arc<vpb::Surface>,
 	pub device: Arc<vpb::Device>,
 	pub swapchain: Arc<vpb::Swapchain>,
+	pub render_pass: Arc<vpb::RenderPass>,
+	pub descriptor_pool: Arc<vpb::DescriptorPool>,
 	pub command_pool: Arc<vpb::CommandPool>,
 	pub command_buffer_setup: Arc<vpb::CommandBuffer>,
 	pub command_buffer_draw: Arc<vpb::CommandBuffer>,
@@ -56,6 +58,10 @@ impl Program {
 			&surface,
 			&device,
 		);
+		let render_pass = vpb::RenderPass::new(
+			&device,
+			&swapchain,
+		);
 		let mut command_pool = vpb::CommandPool::new(
 			&device,
 		);
@@ -69,6 +75,10 @@ impl Program {
 			&mut command_pool,
 			&swapchain,
 		);
+		let descriptor_pool = vpb::DescriptorPool::new(
+			&device,
+			3, // Use 3 frames for max descriptor sets.
+		);
 		let shader_loader = vpb::ShaderLoader::new();
 		let mut program_data = ProgramData {
 			window: Arc::new(window),
@@ -76,6 +86,8 @@ impl Program {
 			surface: Arc::new(surface),
 			device: Arc::new(device),
 			swapchain: Arc::new(swapchain),
+			render_pass: Arc::new(render_pass),
+			descriptor_pool: Arc::new(descriptor_pool),
 			command_pool: Arc::new(command_pool),
 			command_buffer_draw: Arc::new(command_buffer_draw),
 			command_buffer_setup: Arc::new(command_buffer_setup),
@@ -170,12 +182,13 @@ impl Program {
 				event: WindowEvent::Resized(size),
 				..
 			} => {
+				let wa_window = vpb::gmuc!(program_data.window);
+				wa_window.extent = vk::Extent2D {
+					width: size.width,
+					height: size.height,
+				};
 				scene.resize(
-					&program_data.instance,
-					pd_window!(program_data),
-					&program_data.surface,
-					pd_command_pool!(program_data),
-					[size.width, size.height],
+					program_data,
 				);
 			}
 			Event::MainEventsCleared => {

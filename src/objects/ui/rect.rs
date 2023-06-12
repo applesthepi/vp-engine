@@ -67,10 +67,10 @@ impl Object for ObjectRect {
 	fn state(&self) -> Arc<ObjectState> {
 		self.state.clone()
 	}
+	
 	fn update_block_states(
 		&self,
 		device: &vpb::Device,
-		command_buffer: &vk::CommandBuffer,
 		frame: usize,
 	) {
 		let matrix = Isometry3::<f32>::new(
@@ -83,7 +83,6 @@ impl Object for ObjectRect {
 		if let Some(block_state) = self.state.block_states.as_ref() {
 			block_state[1].update(
 				device,
-				command_buffer,
 				&model,
 				Some(frame),
 			);

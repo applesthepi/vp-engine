@@ -2,13 +2,12 @@ use std::{sync::Arc, marker::PhantomData, borrow::Borrow, cell::RefCell};
 
 use ash::vk;
 use bytemuck::bytes_of;
-use nalgebra::{Matrix4, Perspective3, Orthographic3};
+use nalgebra::{Orthographic3, Matrix4};
 
 use crate::{ViewportDepthRange, create_graphics_pipeline, PipelineInfo, BlockCamera, ProgramData, BlockModel, EnginePipeline};
 
 pub struct PipelineSimple<V: vpb::Vertex> {
 	vertex: PhantomData<V>,
-	pub descriptor_pool: vk::DescriptorPool,
 	pub pipeline: vk::Pipeline,
 	pub pipeline_layout: vk::PipelineLayout,
 	pub viewport: [vk::Viewport; 1],
@@ -18,41 +17,59 @@ pub struct PipelineSimple<V: vpb::Vertex> {
 }
 
 impl<V: vpb::Vertex> EnginePipeline for PipelineSimple<V> {
-	fn create_block_states(
-			&self,
-			program_data: &ProgramData,
-			descriptor_pool: &vk::DescriptorPool,
-		) -> Vec<Arc<vpb::BlockState>> {
+	fn create_object_block_states(
+		&self,
+		program_data: &ProgramData,
+	) -> Vec<Arc<vpb::BlockState>> {
 		vec![
-			self.block_state.clone(),
-			// Arc::new(BlockModel::create_block_state(
-			// 	program_data,
-			// 	descriptor_pool,
-			// 	&self.descriptor_set_layouts[1],
-			// 	1,
-			// 	1,
-			// )),
+			self.block_state.clone()
+			// TODO: CREATE NEW MODEL BLOCK STATE
 		]
 	}
+
+	fn recreate_block_states(
+		&mut self,
+		program_data: &ProgramData,
+	) {
+		let block_state = vpb::gmuc!(self.block_state);
+		block_state.recreate_memory(
+			&program_data.device,
+			&program_data.instance,
+			&program_data.descriptor_pool.descriptor_pool,
+			program_data.frame_count,
+		);
+	}
+
+	fn recreate_pipeline(
+		&mut self,
+		program_data: &ProgramData,
+	) { unsafe {
+		let (
+			pipeline,
+			pipeline_layout,
+			viewport,
+			scissor
+		) = create_graphics_pipeline::<V>(
+			program_data,
+			"ui_lighting",
+			PipelineInfo {
+				depth: true,
+				viewport_depth_range: ViewportDepthRange::UI,
+				polygon_mode: vk::PolygonMode::FILL,
+				descriptor_set_layouts: &self.descriptor_set_layouts,
+			},
+		);
+		self.pipeline = pipeline;
+		self.pipeline_layout = pipeline_layout;
+		self.viewport = viewport;
+		self.scissor = scissor;
+	}}
 }
 
 impl<V: vpb::Vertex> PipelineSimple<V> {
 	pub fn new(
 		program_data: &ProgramData,
-		render_pass: &vpb::RenderPass,
 	) -> Self { unsafe {
-		let descriptor_pool_max = 64 * program_data.frame_count as u32;
-		let descriptor_pool_size = vk::DescriptorPoolSize::builder()
-			.descriptor_count(descriptor_pool_max)
-			.build();
-		let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
-			.pool_sizes(&[descriptor_pool_size])
-			.max_sets(descriptor_pool_max)
-			.build();
-		let descriptor_pool = program_data.device.device.create_descriptor_pool(
-			&descriptor_pool_info,
-			None,
-		).unwrap();
 		let mut descriptor_set_layouts = vec![
 			BlockCamera::create_descriptor_set_layout(&program_data.device),
 		];
@@ -63,7 +80,6 @@ impl<V: vpb::Vertex> PipelineSimple<V> {
 			scissor
 		) = create_graphics_pipeline::<V>(
 			program_data,
-			render_pass,
 			"ui_lighting",
 			PipelineInfo {
 				depth: true,
@@ -74,13 +90,11 @@ impl<V: vpb::Vertex> PipelineSimple<V> {
 		);
 		let block_state = Arc::new(BlockCamera::create_block_state(
 			program_data,
-			&descriptor_pool,
 			&descriptor_set_layouts[0],
 			0, 0,
 		));
 		Self {
 			vertex: PhantomData,
-			descriptor_pool,
 			pipeline,
 			pipeline_layout,
 			viewport,
@@ -95,21 +109,45 @@ impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
 	fn get_viewport(&self) -> [vk::Viewport; 1] {
 		self.viewport
 	}
+	
 	fn get_scissor(&self) -> [vk::Rect2D; 1] {
 		self.scissor
 	}
+	
+	fn destroy_block_state_memory(
+		&mut self,
+		device: &Arc<vpb::Device>,
+	) {
+		let block_state = vpb::gmuc!(self.block_state);
+		block_state.destroy_memory(device);
+	}
+	
+	fn destroy_pipeline(
+		&mut self,
+		device: &Arc<vpb::Device>,
+	) { unsafe {
+		device.device.destroy_pipeline(
+			self.pipeline,
+			None,
+		);
+		device.device.destroy_pipeline_layout(
+			self.pipeline_layout,
+			None,
+		);
+	}}
+	
 	fn get_pipeline(&self) -> vk::Pipeline {
 		self.pipeline
 	}
+	
 	fn get_pipeline_layout(&self) -> vk::PipelineLayout {
 		self.pipeline_layout
 	}
-	fn get_descriptor_pool(&self) -> vk::DescriptorPool {
-		self.descriptor_pool
-	}
+
 	fn get_block(&self) -> Arc<vpb::BlockState> {
 		self.block_state.clone()
 	}
+	
 	fn bind_block(
 		&mut self,
 		device: &vpb::Device,
@@ -121,10 +159,11 @@ impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
 			vk::PipelineBindPoint::GRAPHICS,
 			self.pipeline_layout,
 			0,
-			&[self.block_state.descriptor_buffers[frame].set],
+			&[self.block_state.frame_sets[frame].set],
 			&[],
 		);
 	}}
+	
 	fn destroy_set_layout(
 		&mut self,
 		device: &vpb::Device,
@@ -135,31 +174,56 @@ impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
 		);
 		// TODO: bucket destroys object models.
 	}}
+	
 	fn update_blocks(
 		&mut self,
 		device: &vpb::Device,
-		command_buffer: &vk::CommandBuffer,
+		extent: &vk::Extent2D,
 		frame: usize,
-	) { unsafe {
-		let orthographic: Orthographic3<f32> = Orthographic3::new(
+	) {
+		let view = nalgebra_glm::look_at(
+			&nalgebra_glm::vec3(0.0, 0.0, 1.0),
+			&nalgebra_glm::vec3(0.0, 0.0, 0.0),
+			&nalgebra_glm::vec3(0.0, 1.0, 0.0),
+		);
+		let projection = nalgebra_glm::ortho(
 			0.0,
-			100.0,
-			100.0,
+			extent.width as f32,
 			0.0,
+			extent.height as f32,
 			-100.0,
 			100.0,
 		);
+		// let mut projection = nalgebra_glm::perspective(
+		// 	16.0 / 9.0,
+		// 	90.0,
+		// 	0.1,
+		// 	100.0,
+		// );
+		// projection[(1, 1)] *= -1.0;
 		let camera_block = BlockCamera {
-			view: Matrix4::identity().as_slice().try_into().unwrap(),
-			projection: orthographic.as_matrix().as_slice().try_into().unwrap(),
+			view,
+			projection,
 		};
+
+		// let orthographic = nalgebra_glm::ortho(
+		// 	0.0,
+		// 	100.0,
+		// 	100.0,
+		// 	0.0,
+		// 	-100.0,
+		// 	100.0,
+		// );
+		// let camera_block = BlockCamera {
+		// 	view: Dim::value(&nalgebra_glm::identity()).,
+		// 	projection: orthographic.as_slice(),
+		// }
 		self.block_state.update(
 			device,
-			command_buffer,
 			&camera_block,
 			Some(frame),
 		)
-	}}
+	}
 
 	fn object_binding_set(
 		&self,

@@ -47,9 +47,8 @@ impl Bucket {
 		&mut self,
 		mut object: Arc<dyn Object>,
 	) {
-		let block_states = self.pipeline_engine.create_block_states(
+		let block_states = self.pipeline_engine.create_object_block_states(
 			&self.program_data,
-			&self.pipeline.get_descriptor_pool(),
 		);
 		let wa_object = vpb::gmuc!(object);
 		let mut wa_object_state = wa_object.state();
@@ -66,7 +65,7 @@ impl Bucket {
 	) {
 		vpb::gmuc!(self.pipeline).update_blocks(
 			device,
-			command_buffer,
+			&self.program_data.window.extent,
 			frame,
 		);
 		// for object in self.objects.iter() {
@@ -110,7 +109,7 @@ impl Bucket {
 			// 		x.descriptor_buffers[frame].set
 			// 	}
 			// ).collect();
-			let block_state_layouts: Vec<vk::DescriptorSet> = vec![block_states[0].descriptor_buffers[frame].set];
+			let block_state_layouts: Vec<vk::DescriptorSet> = vec![block_states[0].frame_sets[frame].set];
 			device.device.cmd_bind_descriptor_sets(
 				command_buffer,
 				vk::PipelineBindPoint::GRAPHICS,
@@ -149,5 +148,89 @@ impl Bucket {
 				);
 			}
 		}
+	}}
+
+	pub fn destroy_block_state_memory(
+		&mut self,
+	) { unsafe {
+		let wa_pipeline = vpb::gmuc!(self.pipeline);
+		wa_pipeline.destroy_block_state_memory(
+			&self.program_data.device,
+		);
+		for object in self.objects.iter() {
+			let mut state = object.state();
+			let wa_state = vpb::gmuc!(state);
+			let block_states = wa_state.block_states.as_mut().expect(
+				"attempting to recreate block states when there are none",
+			);
+			for block_state in block_states.iter_mut().skip(1) {
+				let block_state = vpb::gmuc_ref!(block_state);
+				block_state.destroy_memory(&self.program_data.device);
+			}
+		}
+	}}
+	
+	pub fn recreate_block_state_memory(
+		&mut self,
+	) { unsafe {
+		let wa_pipeline_engine = vpb::gmuc!(self.pipeline_engine);
+		wa_pipeline_engine.recreate_block_states(
+			&self.program_data,
+		);
+		for object in self.objects.iter() {
+			let mut state = object.state();
+			let wa_state = vpb::gmuc!(state);
+			let block_states = wa_state.block_states.as_mut().expect(
+				"attempting to recreate block states when there are none",
+			);
+			for block_state in block_states.iter_mut().skip(1) {
+				let block_state = vpb::gmuc_ref!(block_state);
+				block_state.recreate_memory(
+					&self.program_data.device,
+					&self.program_data.instance,
+					&self.program_data.descriptor_pool.descriptor_pool,
+					self.program_data.frame_count,
+				);
+			}
+		}
+	}}
+
+	pub fn destroy_pipeline(
+		&mut self,
+	) { unsafe {
+		let wa_pipeline = vpb::gmuc!(self.pipeline);
+		wa_pipeline.destroy_pipeline(&self.program_data.device);
+	}}
+
+	pub fn recreate_pipeline(
+		&mut self,
+	) { unsafe {
+		let wa_pipeline_engine = vpb::gmuc!(self.pipeline_engine);
+		wa_pipeline_engine.recreate_pipeline(&self.program_data);
+		return;
+		// let mut block = self.pipeline.get_block();
+		// let wa_block = vpb::gmuc!(block);
+		// wa_block.recreate(
+		// 	&self.program_data.device,
+		// 	&self.program_data.instance,
+		// 	&self.pipeline.get_descriptor_pool(),
+		// 	self.program_data.frame_count,
+		// );
+		// for object in self.objects.iter() {
+		// 	let mut state = object.state();
+		// 	let wa_state = vpb::gmuc!(state);
+		// 	let block_states = wa_state.block_states.as_mut().expect(
+		// 		"attempting to recreate block states when there are none",
+		// 	);
+		// 	for block_state in block_states.iter_mut() {
+		// 		let wa_block_state = vpb::gmuc_ref!(block_state);
+		// 		wa_block_state.recreate(
+		// 			&self.program_data.device,
+		// 			&self.program_data.instance,
+		// 			&self.pipeline.get_descriptor_pool(),
+		// 			self.program_data.frame_count,
+		// 		);
+		// 	}
+		// }
 	}}
 }

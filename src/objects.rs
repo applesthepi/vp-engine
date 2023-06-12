@@ -33,7 +33,7 @@ impl ObjectState {
 					*command_buffer,
 					0,
 					&[vertex_buffer.buffer_gpu],
-					&[],
+					&[0],
 				);
 				program_data.device.device.cmd_bind_index_buffer(
 					*command_buffer,
@@ -73,7 +73,6 @@ pub trait Object {
 	fn update_block_states(
 		&self,
 		device: &vpb::Device,
-		command_buffer: &vk::CommandBuffer,
 		frame: usize,
 	);
 	// fn bind_block_states(

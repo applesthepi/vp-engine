@@ -10,7 +10,6 @@ use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple
 
 pub struct Scene {
 	program_data: ProgramData,
-	render_pass: vpb::RenderPass,
 	buckets: Vec<Box<Bucket>>,
 	semaphore_present: vk::Semaphore,
 	semaphore_render: vk::Semaphore,
@@ -32,10 +31,6 @@ impl Scene {
 			&semaphore_create_info,
 			None,
 		).unwrap();
-		let render_pass = vpb::RenderPass::new(
-			&program_data.device,
-			&program_data.swapchain,
-		);
 		let (
 			framebuffers,
 			present_image_views,
@@ -43,12 +38,10 @@ impl Scene {
 			depth_image,
 		) = Scene::create_framebuffers(
 			&mut program_data,
-			&render_pass,
 		);
 		program_data.frame_count = framebuffers.len();
 		let pipelines = Scene::create_pipelines(
 			&program_data,
-			&render_pass,
 		);
 		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
 		let pipeline_ui = Arc::new(pipelines.0);
@@ -63,7 +56,6 @@ impl Scene {
 		let frame_count = program_data.frame_count;
 		let scene = Self {
 			program_data,
-			render_pass,
 			buckets,
 			semaphore_present,
 			semaphore_render,
@@ -79,7 +71,6 @@ impl Scene {
 
 	pub fn create_framebuffers(
 		program_data: &mut ProgramData,
-		renderpass: &vpb::RenderPass,
 	) -> (Vec<vk::Framebuffer>, Vec<vk::ImageView>, vk::ImageView, vk::Image) { unsafe {
 		let (present_images, present_image_views) = create_presentation_images(
 			&program_data.device,
@@ -93,7 +84,7 @@ impl Scene {
 			|image_view| {
 				let framebuffer_attachments = [*image_view, depth_image_view];
 				let frame_buffer_info = vk::FramebufferCreateInfo::builder()
-					.render_pass(renderpass.render_pass)
+					.render_pass(program_data.render_pass.render_pass)
 					.attachments(&framebuffer_attachments)
 					.width(program_data.window.extent.width)
 					.height(program_data.window.extent.height)
@@ -112,14 +103,12 @@ impl Scene {
 	#[allow(unused_parens)]
 	pub fn create_pipelines(
 		program_data: &ProgramData,
-		render_pass: &vpb::RenderPass,
 	) -> (
 		PipelineSimple<VertexUI>,
 	) {
 		(
 			PipelineSimple::<VertexUI>::new(
 				program_data,
-				render_pass,
 			),
 		)
 	}
@@ -221,7 +210,7 @@ impl Scene {
 				present_index,
 			);
 		}
-		self.render_pass.open(
+		self.program_data.render_pass.open(
 			&self.program_data.device,
 			&self.program_data.window.extent,
 			&self.framebuffers[present_index],
@@ -234,7 +223,7 @@ impl Scene {
 				present_index,
 			);
 		}
-		self.render_pass.close(
+		self.program_data.render_pass.close(
 			&self.program_data.device,
 			&self.program_data.command_buffer_draw,
 		);
@@ -307,19 +296,101 @@ impl Scene {
 
 	pub fn resize(
 		&mut self,
-		instance: &vpb::Instance,
-		window: &mut vpb::Window,
-		surface: &vpb::Surface,
-		command_pool: &mut vpb::CommandPool,
-		size: [u32; 2],
+		program_data: &mut ProgramData,
+	) { unsafe {
+		self.destroy_swapchain();
+		// SWAPCHAIN
+		Scene::create_swapchain(program_data);
+		// RENDER PASS
+		let render_pass = vpb::gmuc!(
+			self.program_data.render_pass
+		);
+		*render_pass = vpb::RenderPass::new(
+			&self.program_data.device,
+			&program_data.swapchain,
+		);
+		// FRAMEBUFFERS
+		let (
+			framebuffers,
+			present_image_views,
+			depth_image_view,
+			depth_image,
+		) = Scene::create_framebuffers(
+			program_data,
+		);
+		self.framebuffers = framebuffers;
+		self.framebuffer_imageviews = present_image_views;
+		self.depth_image_view = depth_image_view;
+		// PIPELINES
+		for bucket in self.buckets.iter_mut() {
+			bucket.recreate_pipeline();
+		}
+		// DESCRIPTOR POOL
+		let descriptor_pool = vpb::gmuc!(
+			self.program_data.descriptor_pool
+		);
+		*descriptor_pool = vpb::DescriptorPool::new(
+			&self.program_data.device,
+			self.program_data.frame_count,
+		);
+		// DESCRIPTOR MEMORY
+		for bucket in self.buckets.iter_mut() {
+			bucket.recreate_block_state_memory();
+		}
+		// COMMAND BUFFERS
+		let command_buffer_draw = vpb::CommandBuffer::new(
+			&program_data.device,
+			&program_data.command_pool,
+			&program_data.swapchain,
+		);
+		let command_buffer_setup = vpb::CommandBuffer::new(
+			&program_data.device,
+			&program_data.command_pool,
+			&program_data.swapchain,
+		);
+		self.setup_submit(
+			&depth_image,
+		);
+	}}
+
+	fn destroy_swapchain(
+		&mut self,
 	) { unsafe {
 		self.idle();
+		// COMMAND BUFFERS
+		self.program_data.device.device.free_command_buffers(
+			self.program_data.command_pool.command_pool,
+			&[
+				self.program_data.command_buffer_setup.command_buffer,
+				self.program_data.command_buffer_draw.command_buffer,
+			],
+		);
+		// DESCRIPTOR POOL
+		self.program_data.device.device.destroy_descriptor_pool(
+			self.program_data.descriptor_pool.descriptor_pool,
+			None,
+		);
+		// DESCRIPTOR MEMORY
+		for bucket in self.buckets.iter_mut() {
+			bucket.destroy_block_state_memory();
+		}
+		// FRAMEBUFFERS
 		for framebuffer in self.framebuffers.iter() {
 			self.program_data.device.device.destroy_framebuffer(
 				*framebuffer,
 				None,
 			);
 		}
+		// PIPELINES
+		for bucket in self.buckets.iter_mut() {
+			bucket.destroy_pipeline();
+		}
+		// RENDER PASS
+		self.program_data.device.device.destroy_render_pass(
+			self.program_data.render_pass.render_pass,
+			None,
+		);
+		// SWAPCHAIN IMAGE VIEWS
 		for image_view in self.framebuffer_imageviews.iter() {
 			self.program_data.device.device.destroy_image_view(
 				*image_view,
@@ -330,78 +401,23 @@ impl Scene {
 			self.depth_image_view,
 			None,
 		);
-		// self.program_data.device.device.free_command_buffers(
-		// 	command_pool.command_pool,
-		// 	&[
-		// 		self.program_data.command_buffer_setup.command_buffer,
-		// 		self.program_data.command_buffer_draw.command_buffer
-		// 	],
-		// );
-		// for bucket in self.buckets.iter_mut() {
-		// 	self.program_data.device.device.destroy_pipeline(
-		// 		bucket.pipeline.get_pipeline(),
-		// 		None,
-		// 	);
-		// 	bucket.destroy_descriptor_set_layouts();
-		// }
-		// self.program_data.device.device.destroy_render_pass(
-		// 	self.render_pass.render_pass,
-		// 	None,
-		// );
+		// SWAPCHAIN
 		self.program_data.swapchain.swapchain_loader.destroy_swapchain(
 			self.program_data.swapchain.swapchain,
 			None,
 		);
-		window.extent = vk::Extent2D {
-			width: size[0],
-			height: size[1],
-		};
-		let swapchain = vpb::Swapchain::new(
-			instance,
-			window,
-			surface,
-			&self.program_data.device,
-		);
-		// let render_pass = vpb::RenderPass::new(
-		// 	&self.program_data.device,
-		// 	&swapchain,
-		// );
-		self.program_data.swapchain = Arc::new(swapchain);
-		// let bucket_ui_program_data = self.program_data.clone();
-		// self.render_pass = render_pass;
-		// let pipelines = Scene::create_pipelines(
-		// 	&self.program_data,
-		// 	&self.render_pass,
-		// );
-		// let bucket_ui = self.get_bucket("ui");
-		// bucket_ui.pipeline = Box::new(pipelines.0);
-		// bucket_ui.program_data = bucket_ui_program_data;
-		let (
-			framebuffers,
-			present_image_views,
-			depth_image_view,
-			depth_image,
-		) = Scene::create_framebuffers(
-			&mut self.program_data,
-			&self.render_pass,
-		);
-		self.framebuffers = framebuffers;
-		self.framebuffer_imageviews = present_image_views;
-		self.depth_image_view = depth_image_view;
-		// let command_buffer_setup = vpb::CommandBuffer::new(
-		// 	&mut self.program_data.device,
-		// 	command_pool,
-		// 	&self.program_data.swapchain,
-		// );
-		// let command_buffer_draw = vpb::CommandBuffer::new(
-		// 	&mut self.program_data.device,
-		// 	command_pool,
-		// 	&self.program_data.swapchain,
-		// );
-		// self.program_data.command_buffer_setup = Arc::new(command_buffer_setup);
-		// self.program_data.command_buffer_draw = Arc::new(command_buffer_draw);
-		self.setup_submit(
-			&depth_image,
-		);
 	}}
+
+	fn create_swapchain(
+		program_data: &mut ProgramData,
+	) {
+		let swapchain = vpb::Swapchain::new(
+			&program_data.instance,
+			vpb::gmuc!(program_data.window),
+			&program_data.surface,
+			&program_data.device,
+		);
+		let wa_swapchain = vpb::gmuc!(program_data.swapchain);
+		*wa_swapchain = swapchain;
+	}
 }

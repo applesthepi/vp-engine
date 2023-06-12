@@ -3,6 +3,7 @@ use std::mem;
 use ash::vk;
 use memoffset::offset_of;
 
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct VertexUI {
 	pub position: [f32; 2],

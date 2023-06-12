@@ -1,21 +1,19 @@
 use std::{mem::size_of, sync::Arc};
 
 use ash::vk;
-use bytemuck::{Pod, Zeroable};
 
 use crate::ProgramData;
 
 #[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
+#[derive(Copy, Clone)]
 pub struct BlockCamera {
-	pub view: [f32; 16],
-	pub projection: [f32; 16],
+	pub view: nalgebra_glm::Mat4,
+	pub projection: nalgebra_glm::Mat4,
 }
 
 impl BlockCamera {
 	pub fn create_block_state(
 		program_data: &ProgramData,
-		descriptor_pool: &vk::DescriptorPool,
 		descriptor_set_layout: &vk::DescriptorSetLayout,
 		binding: u32,
 		set: u32,
@@ -23,7 +21,7 @@ impl BlockCamera {
 		let block_state = vpb::BlockState::new(
 			&program_data.device,
 			&program_data.instance,
-			descriptor_pool,
+			&program_data.descriptor_pool.descriptor_pool,
 			descriptor_set_layout,
 			program_data.frame_count,
 			binding,
