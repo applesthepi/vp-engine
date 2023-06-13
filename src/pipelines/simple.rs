@@ -1,179 +1,90 @@
 use std::{sync::Arc, marker::PhantomData, borrow::Borrow, cell::RefCell};
 
 use ash::vk;
-use bytemuck::bytes_of;
-use nalgebra::{Orthographic3, Matrix4};
 
-use crate::{ViewportDepthRange, create_graphics_pipeline, PipelineInfo, BlockCamera, ProgramData, BlockModel, EnginePipeline};
+use crate::{ViewportDepthRange, PipelineInfo, BlockCamera, ProgramData, BlockModel, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState};
 
 pub struct PipelineSimple<V: vpb::Vertex> {
 	vertex: PhantomData<V>,
-	pub pipeline: vk::Pipeline,
-	pub pipeline_layout: vk::PipelineLayout,
-	pub viewport: [vk::Viewport; 1],
-	pub scissor: [vk::Rect2D; 1],
-	pub descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-	pub block_state: Arc<vpb::BlockState>,
-}
-
-impl<V: vpb::Vertex> EnginePipeline for PipelineSimple<V> {
-	fn create_object_block_states(
-		&self,
-		program_data: &ProgramData,
-	) -> Vec<Arc<vpb::BlockState>> {
-		vec![
-			self.block_state.clone(),
-			Arc::new(BlockModel::create_block_state(
-				program_data,
-				&self.descriptor_set_layouts[1],
-				1, 1,
-			))
-		]
-	}
-
-	fn recreate_block_states(
-		&mut self,
-		program_data: &ProgramData,
-	) {
-		let block_state = vpb::gmuc!(self.block_state);
-		block_state.recreate_memory(
-			&program_data.device,
-			&program_data.instance,
-			&program_data.descriptor_pool.descriptor_pool,
-			program_data.frame_count,
-		);
-	}
-
-	fn recreate_pipeline(
-		&mut self,
-		program_data: &ProgramData,
-	) { unsafe {
-		let (
-			pipeline,
-			pipeline_layout,
-			viewport,
-			scissor
-		) = create_graphics_pipeline::<V>(
-			program_data,
-			"ui_lighting",
-			PipelineInfo {
-				depth: true,
-				viewport_depth_range: ViewportDepthRange::UI,
-				polygon_mode: vk::PolygonMode::FILL,
-				descriptor_set_layouts: &self.descriptor_set_layouts,
-			},
-		);
-		self.pipeline = pipeline;
-		self.pipeline_layout = pipeline_layout;
-		self.viewport = viewport;
-		self.scissor = scissor;
-	}}
+	pipeline_info: Arc<PipelineInfo>,
+	pipeline_block_structure: Arc<ObjectBlockStructure>,
+	object_block_structure: Arc<ObjectBlockStructure>,
 }
 
 impl<V: vpb::Vertex> PipelineSimple<V> {
 	pub fn new(
 		program_data: &ProgramData,
 	) -> Self { unsafe {
-		let mut descriptor_set_layouts = vec![
-			BlockCamera::create_descriptor_set_layout(&program_data.device),
-			BlockModel::create_descriptor_set_layout(&program_data.device),
-		];
-		let (
-			pipeline,
-			pipeline_layout,
-			viewport,
-			scissor
-		) = create_graphics_pipeline::<V>(
+		let pipeline_block_structure = Arc::new(ObjectBlockStructure {
+			spawners: vec![
+				Box::new(vpb::BlockSpawner::<BlockCamera>::new(
+					&program_data.device,
+					0, 0,
+				))
+			],
+		});
+		let object_block_structure = Arc::new(ObjectBlockStructure {
+			spawners: vec![
+				Box::new(vpb::BlockSpawner::<BlockModel>::new(
+					&program_data.device,
+					1, 1,
+				))
+			],
+		});
+		let pipeline_info = Arc::new(PipelineInfo::new::<VertexUI>(
 			program_data,
 			"ui_lighting",
-			PipelineInfo {
-				depth: true,
-				viewport_depth_range: ViewportDepthRange::UI,
-				polygon_mode: vk::PolygonMode::FILL,
-				descriptor_set_layouts: &descriptor_set_layouts,
-			},
-		);
-		let block_state = Arc::new(BlockCamera::create_block_state(
-			program_data,
-			&descriptor_set_layouts[0],
-			0, 0,
+			true,
+			ViewportDepthRange::UI,
+			vk::PolygonMode::FILL,
+			&pipeline_block_structure,
+			&object_block_structure,
 		));
 		Self {
 			vertex: PhantomData,
-			pipeline,
-			pipeline_layout,
-			viewport,
-			scissor,
-			block_state,
-			descriptor_set_layouts,
+			pipeline_info,
+			pipeline_block_structure,
+			object_block_structure,
 		}
 	}}
 }
 
-impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
-	fn get_viewport(&self) -> [vk::Viewport; 1] {
-		self.viewport
-	}
-	
-	fn get_scissor(&self) -> [vk::Rect2D; 1] {
-		self.scissor
-	}
-	
-	fn destroy_block_state_memory(
-		&mut self,
-		device: &Arc<vpb::Device>,
-	) {
-		let block_state = vpb::gmuc!(self.block_state);
-		block_state.destroy_memory(device);
-	}
-	
-	fn destroy_pipeline(
-		&mut self,
-		device: &Arc<vpb::Device>,
-	) { unsafe {
-		device.device.destroy_pipeline(
-			self.pipeline,
-			None,
-		);
-		device.device.destroy_pipeline_layout(
-			self.pipeline_layout,
-			None,
-		);
-	}}
-	
-	fn get_pipeline(&self) -> vk::Pipeline {
-		self.pipeline
-	}
-	
-	fn get_pipeline_layout(&self) -> vk::PipelineLayout {
-		self.pipeline_layout
+impl<V: vpb::Vertex> EnginePipeline for PipelineSimple<V> {
+	fn get_pipeline_info(
+		&self,
+	) -> Arc<PipelineInfo> {
+		self.pipeline_info.clone()
 	}
 
-	fn get_block(&self) -> Arc<vpb::BlockState> {
-		self.block_state.clone()
+	fn get_pipeline_block_structure(
+		&self,
+	) -> Arc<ObjectBlockStructure> {
+		self.pipeline_block_structure.clone()
 	}
-	
-	fn bind_block(
+
+	fn get_object_block_structure(
+		&self,
+	) -> Arc<ObjectBlockStructure> {
+		self.object_block_structure.clone()
+	}
+
+	fn recreate_pipeline(
 		&mut self,
-		device: &vpb::Device,
-		command_buffer: &vk::CommandBuffer,
-		frame: usize,
-	) { unsafe {
-		device.device.cmd_bind_descriptor_sets(
-			*command_buffer,
-			vk::PipelineBindPoint::GRAPHICS,
-			self.pipeline_layout,
-			0,
-			&[self.block_state.frame_sets[frame].set],
-			&[],
+		program_data: &ProgramData,
+	) {
+		let pipeline_info = vpb::gmuc!(self.pipeline_info);
+		pipeline_info.recreate_pipeline::<VertexUI>(
+			program_data,
+			&self.pipeline_block_structure,
+			&self.object_block_structure,
 		);
-	}}
-	
-	fn update_blocks(
-		&mut self,
-		device: &vpb::Device,
-		extent: &vk::Extent2D,
-		frame: usize,
+	}
+
+	fn update_block_states(
+		&self,
+		program_data: &ProgramData,
+		input_state: &InputState,
+		render_state: &RenderState,
 	) {
 		let view = nalgebra_glm::look_at(
 			&nalgebra_glm::vec3(0.0, 0.0, 1.0),
@@ -182,49 +93,20 @@ impl<V: vpb::Vertex> vpb::Pipeline for PipelineSimple<V> {
 		);
 		let projection = nalgebra_glm::ortho(
 			0.0,
-			extent.width as f32,
+			program_data.window.extent.width as f32,
 			0.0,
-			extent.height as f32,
+			program_data.window.extent.height as f32,
 			-100.0,
 			100.0,
 		);
-		// let mut projection = nalgebra_glm::perspective(
-		// 	16.0 / 9.0,
-		// 	90.0,
-		// 	0.1,
-		// 	100.0,
-		// );
-		// projection[(1, 1)] *= -1.0;
 		let camera_block = BlockCamera {
 			view,
 			projection,
 		};
-
-		// let orthographic = nalgebra_glm::ortho(
-		// 	0.0,
-		// 	100.0,
-		// 	100.0,
-		// 	0.0,
-		// 	-100.0,
-		// 	100.0,
-		// );
-		// let camera_block = BlockCamera {
-		// 	view: Dim::value(&nalgebra_glm::identity()).,
-		// 	projection: orthographic.as_slice(),
-		// }
-		self.block_state.update(
-			device,
+		self.pipeline_info.block_states[0].update(
+			&program_data.device,
 			&camera_block,
-			Some(frame),
+			Some(render_state.frame),
 		)
-	}
-
-	fn object_binding_set(
-		&self,
-	) -> Vec<(u32, u32)> {
-		vec![
-			(1, 0),
-			(1, 1),
-		]
 	}
 }

@@ -6,7 +6,7 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple};
+use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple, InputState, RenderState};
 
 pub struct Scene {
 	program_data: ProgramData,
@@ -16,6 +16,8 @@ pub struct Scene {
 	framebuffers: Vec<vk::Framebuffer>,
 	framebuffer_imageviews: Vec<vk::ImageView>,
 	depth_image_view: vk::ImageView,
+	input_state: InputState,
+	render_state: RenderState,
 }
 
 impl Scene {
@@ -48,10 +50,8 @@ impl Scene {
 		let pipeline_ui_engine = pipeline_ui.clone();
 		buckets.push(Box::new(Bucket::new(
 			"ui",
-			pipeline_ui,
 			pipeline_ui_engine,
 			program_data.clone(),
-			2,
 		)));
 		let frame_count = program_data.frame_count;
 		let scene = Self {
@@ -62,6 +62,8 @@ impl Scene {
 			framebuffers,
 			framebuffer_imageviews: present_image_views,
 			depth_image_view,
+			input_state: InputState::default(),
+			render_state: RenderState::default(),
 		};
 		scene.setup_submit(
 			&depth_image
@@ -100,7 +102,6 @@ impl Scene {
 		(framebuffers, present_image_views, depth_image_view, depth_image)
 	}}
 
-	#[allow(unused_parens)]
 	pub fn create_pipelines(
 		program_data: &ProgramData,
 	) -> (
@@ -197,6 +198,7 @@ impl Scene {
 		&mut self,
 	) {
 		let present_index = self.acquire_next_image();
+		self.render_state.frame = present_index;
 		self.sync_fences(
 			&self.program_data.command_buffer_draw,
 		);
@@ -205,8 +207,8 @@ impl Scene {
 		);
 		for bucket in self.buckets.iter_mut() {
 			bucket.update_blocks(
-				&self.program_data.device,
-				present_index,
+				&self.input_state,
+				&self.render_state,
 			);
 		}
 		self.program_data.render_pass.open(

@@ -61,25 +61,10 @@ impl ObjectState {
 
 pub trait Object {
 	fn state(&self) -> Arc<ObjectState>;
-	// fn name(&self) -> &String;
-	// fn vertex_buffer(&self) -> Arc<dyn vpb::VertexBuffer>;
-	// fn index_buffer(&self) -> Arc<dyn vpb::IndexBuffer>;
-	// fn setup_block_states(
-	// 	&mut self,
-	// 	program_data: &ProgramData,
-	// 	descriptor_pool: &vk::DescriptorPool,
-	// 	pipeline_block_state: Arc<vpb::BlockState>,
-	// );
+	
 	fn update_block_states(
 		&self,
 		device: &vpb::Device,
 		frame: usize,
 	);
-	// fn bind_block_states(
-	// 	&self,
-	// 	device: &vpb::Device,
-	// 	command_buffer: &vk::CommandBuffer,
-	// 	pipeline_layout: &vk::PipelineLayout,
-	// 	frame: usize,
-	// );
 }
