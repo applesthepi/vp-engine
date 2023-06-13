@@ -108,13 +108,13 @@ impl Program {
 		mut program_data: Arc<ProgramData>,
 		mut scene: Arc<Scene>,
 		event_loop: EventLoop<()>,
-		fn_open: FO,
-		fn_close: FC,
-		fn_render: FR,
+		mut fn_open: FO,
+		mut fn_close: FC,
+		mut fn_render: FR,
 	) where
-	FO: Fn(&mut Scene) + 'static,
-	FC: Fn(&mut Scene) + 'static,
-	FR: Fn(&mut Scene) + 'static { unsafe {
+	FO: FnMut(&mut Scene) + 'static,
+	FC: FnMut(&mut Scene) + 'static,
+	FR: FnMut(&mut Scene) + 'static { unsafe {
 		// let mut scene = self.scene.clone();
 		{
 			let scene = Arc::get_mut_unchecked(
@@ -138,8 +138,8 @@ impl Program {
 					&event,
 					control_flow,
 					// &mut self,
-					&fn_render,
-					&fn_close,
+					&mut fn_render,
+					&mut fn_close,
 				);
 			}
 		);
@@ -154,11 +154,11 @@ impl Program {
 		control_flow: &mut ControlFlow,
 		// scene: &mut Arc<Scene>,
 		// program
-		fn_render: &FR,
-		fn_close: &FC,
+		fn_render: &mut FR,
+		fn_close: &mut FC,
 	) where
-	FC: Fn(&mut Scene) + 'static,
-	FR: Fn(&mut Scene) + 'static { unsafe {
+	FC: FnMut(&mut Scene) + 'static,
+	FR: FnMut(&mut Scene) + 'static { unsafe {
 		match event {
 			Event::WindowEvent {
 				event:

@@ -11,11 +11,31 @@ pub enum ObjectStateBuffers {
 	GO(Arc<vpb::VertexBufferGO>, Arc<vpb::IndexBufferGO>),
 }
 
+pub enum DirtyState {
+	Clean,
+	
+	// SPECIFIC
+
+	/// Vertex buffers.
+	VB,
+	/// Index buffers.
+	IB,
+	/// Block states.
+	BS,
+
+	// GENERAL
+	
+	Position,
+	Size,
+	Mesh,
+}
+
 /// Every object has an object state to be referenced from above.
 pub struct ObjectState {
 	pub name: String,
 	pub block_states: Option<Vec<Arc<vpb::BlockState>>>,
 	pub buffers: ObjectStateBuffers,
+	pub dirty_state: DirtyState,
 }
 
 impl ObjectState {
@@ -67,4 +87,11 @@ pub trait Object {
 		device: &vpb::Device,
 		frame: usize,
 	);
+
+	fn dirty(
+		&mut self,
+		dirty_state: DirtyState,
+	) {
+		vpb::gmuc!(self.state()).dirty_state = dirty_state;
+	}
 }

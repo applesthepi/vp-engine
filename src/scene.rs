@@ -1,23 +1,24 @@
 mod bucket;
 
-use std::{sync::Arc, marker::PhantomData};
+use std::{sync::Arc, marker::PhantomData, time::Instant};
 
 use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple, InputState, RenderState};
+use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple, InputState, RenderState, RenderStateLocal};
 
 pub struct Scene {
-	program_data: ProgramData,
+	pub program_data: ProgramData,
 	buckets: Vec<Box<Bucket>>,
 	semaphore_present: vk::Semaphore,
 	semaphore_render: vk::Semaphore,
 	framebuffers: Vec<vk::Framebuffer>,
 	framebuffer_imageviews: Vec<vk::ImageView>,
 	depth_image_view: vk::ImageView,
-	input_state: InputState,
-	render_state: RenderState,
+	pub input_state: InputState,
+	pub render_state: RenderState,
+	render_state_local: RenderStateLocal,
 }
 
 impl Scene {
@@ -64,6 +65,9 @@ impl Scene {
 			depth_image_view,
 			input_state: InputState::default(),
 			render_state: RenderState::default(),
+			render_state_local: RenderStateLocal {
+				delta_timer: Instant::now(),
+			},
 		};
 		scene.setup_submit(
 			&depth_image
@@ -205,6 +209,10 @@ impl Scene {
 		self.program_data.command_buffer_draw.open(
 			&self.program_data.device
 		);
+		let elapsed_micros = self.render_state_local.delta_timer.elapsed().as_micros();
+		self.render_state_local.delta_timer = Instant::now();
+		self.render_state.delta_time = elapsed_micros as f64 / 1_000_000.0;
+		println!("{:.3}ms", self.render_state.delta_time * 1_000.0);
 		for bucket in self.buckets.iter_mut() {
 			bucket.update_blocks(
 				&self.input_state,
