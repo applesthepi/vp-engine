@@ -2,9 +2,9 @@ use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell,
 
 use ash::vk::{Instance, self};
 use shaderc::{ShaderKind, CompileOptions};
-use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}};
+use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseButton}};
 
-use crate::Scene;
+use crate::{Scene, pipelines::ui::PipelineUI, EnginePipeline};
 
 mod macros;
 pub use macros::*;
@@ -194,6 +194,57 @@ impl Program {
 			Event::MainEventsCleared => {
 				fn_render(scene);
 				scene.render();
+			},
+			Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => {
+				let value = match input.state {
+					ElementState::Pressed => true,
+					ElementState::Released => false,
+				};
+				if let Some(x) = input.virtual_keycode {
+					scene.input_state.down_keys[x as usize] = value;
+				}
+			},
+			Event::WindowEvent { event: WindowEvent::MouseInput { device_id, state, button, modifiers }, .. } =>  {
+				match button {
+					MouseButton::Left => {
+						match state {
+							ElementState::Pressed => {
+								scene.input_state.mouse.left = true;
+								// wa_program.user_io.init_rotation_vector = wa_program.user_io.camera_rotation;
+								// wa_program.user_io.init_mouse = wa_program.user_io.mouse_position;
+								// wa_program.user_io.mouse_down = true;
+							},
+							ElementState::Released => {
+								scene.input_state.mouse.left = false;
+								// wa_program.user_io.mouse_down = false;
+							}
+						}
+					},
+					MouseButton::Middle => {
+						match state {
+							ElementState::Pressed => {
+								scene.input_state.mouse.middle = true;
+							},
+							ElementState::Released => {
+								scene.input_state.mouse.middle = false;
+							}
+						}
+					},
+					MouseButton::Right => {
+						match state {
+							ElementState::Pressed => {
+								scene.input_state.mouse.right = true;
+							},
+							ElementState::Released => {
+								scene.input_state.mouse.right = false;
+							}
+						}
+					},
+					_ => {}
+				}
+			},
+			Event::WindowEvent { event: WindowEvent::CursorMoved { device_id, position, modifiers }, .. } => {
+				scene.input_state.mouse.position = [position.x as i32, position.y as i32];
 			},
 			_ => {},
 		}

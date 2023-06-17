@@ -6,6 +6,7 @@ use ash::vk;
 #[derive(Copy, Clone)]
 pub struct BlockModel {
 	pub model: nalgebra_glm::Mat4,
+	pub color: nalgebra_glm::Vec4,
 }
 
 impl vpb::Block for BlockModel {

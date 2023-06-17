@@ -62,15 +62,16 @@ impl Bucket {
 		input_state: &InputState,
 		render_state: &RenderState,
 	) {
-		self.engine_pipeline.update_block_states(
+		vpb::gmuc!(self.engine_pipeline).update_block_states(
 			&self.program_data,
 			input_state,
 			render_state,
 		);
-		for object in self.objects.iter() {
-			object.update_block_states(
+		for object in self.objects.iter_mut() {
+			vpb::gmuc_ref!(object).update_block_states(
 				&self.program_data.device,
 				render_state.frame,
+				self.program_data.frame_count,
 			);
 		}
 	}

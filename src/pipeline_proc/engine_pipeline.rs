@@ -25,7 +25,7 @@ pub trait EnginePipeline {
 	);
 	
 	fn update_block_states(
-		&self,
+		&mut self,
 		program_data: &ProgramData,
 		input_state: &InputState,
 		render_state: &RenderState,

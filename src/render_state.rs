@@ -3,7 +3,7 @@ use std::time::Instant;
 #[derive(Default)]
 pub struct RenderState {
 	pub frame: usize,
-	pub delta_time: f64,
+	pub delta_time: f32,
 }
 
 pub struct RenderStateLocal {

@@ -1,17 +1,16 @@
-use std::{sync::Arc, marker::PhantomData, borrow::Borrow, cell::RefCell};
+use std::sync::Arc;
 
 use ash::vk;
 
 use crate::{ViewportDepthRange, PipelineInfo, BlockCamera, ProgramData, BlockModel, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState};
 
-pub struct PipelineSimple<V: vpb::Vertex> {
-	vertex: PhantomData<V>,
+pub struct PipelineUI {
 	pipeline_info: Arc<PipelineInfo>,
 	pipeline_block_structure: Arc<ObjectBlockStructure>,
 	object_block_structure: Arc<ObjectBlockStructure>,
 }
 
-impl<V: vpb::Vertex> PipelineSimple<V> {
+impl PipelineUI {
 	pub fn new(
 		program_data: &ProgramData,
 	) -> Self { unsafe {
@@ -41,7 +40,6 @@ impl<V: vpb::Vertex> PipelineSimple<V> {
 			&object_block_structure,
 		));
 		Self {
-			vertex: PhantomData,
 			pipeline_info,
 			pipeline_block_structure,
 			object_block_structure,
@@ -49,7 +47,7 @@ impl<V: vpb::Vertex> PipelineSimple<V> {
 	}}
 }
 
-impl<V: vpb::Vertex> EnginePipeline for PipelineSimple<V> {
+impl EnginePipeline for PipelineUI {
 	fn get_pipeline_info(
 		&self,
 	) -> Arc<PipelineInfo> {
@@ -81,7 +79,7 @@ impl<V: vpb::Vertex> EnginePipeline for PipelineSimple<V> {
 	}
 
 	fn update_block_states(
-		&self,
+		&mut self,
 		program_data: &ProgramData,
 		input_state: &InputState,
 		render_state: &RenderState,

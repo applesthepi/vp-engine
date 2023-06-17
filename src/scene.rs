@@ -6,7 +6,7 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, simple::PipelineSimple, InputState, RenderState, RenderStateLocal};
+use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui::PipelineUI, EnginePipeline};
 
 pub struct Scene {
 	pub program_data: ProgramData,
@@ -43,19 +43,9 @@ impl Scene {
 			&mut program_data,
 		);
 		program_data.frame_count = framebuffers.len();
-		let pipelines = Scene::create_pipelines(
-			&program_data,
-		);
 		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
-		let pipeline_ui = Arc::new(pipelines.0);
-		let pipeline_ui_engine = pipeline_ui.clone();
-		buckets.push(Box::new(Bucket::new(
-			"ui",
-			pipeline_ui_engine,
-			program_data.clone(),
-		)));
 		let frame_count = program_data.frame_count;
-		let scene = Self {
+		let mut scene = Self {
 			program_data,
 			buckets,
 			semaphore_present,
@@ -63,12 +53,17 @@ impl Scene {
 			framebuffers,
 			framebuffer_imageviews: present_image_views,
 			depth_image_view,
-			input_state: InputState::default(),
+			input_state: InputState::new(),
 			render_state: RenderState::default(),
 			render_state_local: RenderStateLocal {
 				delta_timer: Instant::now(),
 			},
 		};
+		scene.add_bucket("ui", |program_data| {
+			Arc::new(PipelineUI::new(
+				program_data,
+			))
+		});
 		scene.setup_submit(
 			&depth_image
 		);
@@ -106,16 +101,16 @@ impl Scene {
 		(framebuffers, present_image_views, depth_image_view, depth_image)
 	}}
 
-	pub fn create_pipelines(
-		program_data: &ProgramData,
-	) -> (
-		PipelineSimple<VertexUI>,
-	) {
-		(
-			PipelineSimple::<VertexUI>::new(
-				program_data,
-			),
-		)
+	pub fn add_bucket<FC>(
+		&mut self,
+		name: &str,
+		creator: FC,
+	) where FC: Fn(&ProgramData) -> Arc<dyn EnginePipeline> {
+		self.buckets.push(Box::new(Bucket::new(
+			name,
+			creator(&self.program_data),
+			self.program_data.clone(),
+		)));
 	}
 
 	pub fn get_bucket(
@@ -211,8 +206,8 @@ impl Scene {
 		);
 		let elapsed_micros = self.render_state_local.delta_timer.elapsed().as_micros();
 		self.render_state_local.delta_timer = Instant::now();
-		self.render_state.delta_time = elapsed_micros as f64 / 1_000_000.0;
-		println!("{:.3}ms", self.render_state.delta_time * 1_000.0);
+		self.render_state.delta_time = elapsed_micros as f32 / 1_000_000.0;
+		// println!("{:.3}ms", self.render_state.delta_time * 1_000.0);
 		for bucket in self.buckets.iter_mut() {
 			bucket.update_blocks(
 				&self.input_state,
