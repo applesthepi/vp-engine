@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ash::vk;
+use nalgebra::Matrix4;
 
 use crate::{ViewportDepthRange, PipelineInfo, BlockCamera, ProgramData, BlockModel, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState};
 
@@ -84,12 +85,8 @@ impl EnginePipeline for PipelineUI {
 		input_state: &InputState,
 		render_state: &RenderState,
 	) {
-		let view = nalgebra_glm::look_at(
-			&nalgebra_glm::vec3(0.0, 0.0, 1.0),
-			&nalgebra_glm::vec3(0.0, 0.0, 0.0),
-			&nalgebra_glm::vec3(0.0, 1.0, 0.0),
-		);
-		let projection = nalgebra_glm::ortho(
+		let view = Matrix4::identity();
+		let projection = Matrix4::new_orthographic(
 			0.0,
 			program_data.window.extent.width as f32,
 			0.0,

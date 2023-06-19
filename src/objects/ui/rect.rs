@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use nalgebra::{Matrix4, Vector3, Vector4};
+
 use crate::{Object, VertexUI, BlockModel, ObjectState, ObjectStateBuffers, ProgramData};
 
 pub struct ObjectRect {
@@ -122,9 +124,8 @@ impl Object for ObjectRect {
 		device: &vpb::Device,
 		frame: usize,
 	) { unsafe {
-		let model = nalgebra_glm::translate(
-			&nalgebra_glm::identity(),
-			&nalgebra_glm::vec3(
+		let model = Matrix4::new_translation(
+			&Vector3::new(
 				self.position[0],
 				self.position[1],
 				0.0,
@@ -132,7 +133,7 @@ impl Object for ObjectRect {
 		);
 		let model_block = BlockModel {
 			model,
-			color: nalgebra_glm::vec4(
+			color: Vector4::new(
 				self.color[0],
 				self.color[1],
 				self.color[2],

@@ -9,8 +9,8 @@ use crate::{ProgramData, InputState, RenderState};
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BlockCamera {
-	pub view: nalgebra_glm::Mat4,
-	pub projection: nalgebra_glm::Mat4,
+	pub view: Matrix4<f32>,
+	pub projection: Matrix4<f32>,
 }
 
 impl vpb::Block for BlockCamera {
@@ -57,7 +57,7 @@ impl vpb::Block for BlockCamera {
 	}}
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct CameraState {
 	pub camera_preposition: Vector3<f32>,
 	pub camera_postposition: Vector3<f32>,

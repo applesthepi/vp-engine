@@ -51,7 +51,7 @@ impl PipelineInfo {
 			scissor
 		) = create_graphics_pipeline::<V>(
 			program_data,
-			"ui_lighting",
+			name,
 			&pipeline_info,
 			pipeline_block_structure,
 			object_block_structure,

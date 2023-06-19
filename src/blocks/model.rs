@@ -1,12 +1,13 @@
 use std::{mem::size_of, sync::Arc};
 
 use ash::vk;
+use nalgebra::{Vector4, Matrix4};
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BlockModel {
-	pub model: nalgebra_glm::Mat4,
-	pub color: nalgebra_glm::Vec4,
+	pub model: Matrix4<f32>,
+	pub color: Vector4<f32>,
 }
 
 impl vpb::Block for BlockModel {
