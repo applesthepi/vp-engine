@@ -13,6 +13,7 @@ pub struct PipelineInfo {
 	pub viewport_depth_range: ViewportDepthRange,
 	pub polygon_mode: vk::PolygonMode,
 	pub block_states: Vec<Arc<vpb::BlockState>>,
+	pub name: String,
 }
 
 impl PipelineInfo {
@@ -43,6 +44,7 @@ impl PipelineInfo {
 			viewport_depth_range,
 			polygon_mode,
 			block_states,
+			name: name.to_string(),
 		};
 		let (
 			pipeline,
@@ -76,7 +78,7 @@ impl PipelineInfo {
 			scissor
 		) = create_graphics_pipeline::<V>(
 			program_data,
-			"ui_lighting",
+			&self.name,
 			&self,
 			pipeline_block_structure,
 			object_block_structure,
