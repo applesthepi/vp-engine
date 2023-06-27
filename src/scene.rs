@@ -6,7 +6,7 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui::PipelineUI, EnginePipeline};
+use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui::PipelineUI, EnginePipeline, CameraState};
 
 pub struct Scene {
 	pub program_data: ProgramData,
@@ -19,6 +19,7 @@ pub struct Scene {
 	pub input_state: InputState,
 	pub render_state: RenderState,
 	render_state_local: RenderStateLocal,
+	camera_state: Option<Arc<CameraState>>,
 }
 
 impl Scene {
@@ -58,6 +59,7 @@ impl Scene {
 			render_state_local: RenderStateLocal {
 				delta_timer: Instant::now(),
 			},
+			camera_state: None,
 		};
 		scene.add_bucket("ui", |program_data| {
 			Arc::new(PipelineUI::new(
@@ -69,6 +71,13 @@ impl Scene {
 		);
 		(scene, frame_count)
 	}}
+
+	pub fn set_camera_state(
+		&mut self,
+		camera_state: Arc<CameraState>,
+	) {
+		self.camera_state = Some(camera_state);
+	}
 
 	pub fn create_framebuffers(
 		program_data: &mut ProgramData,
@@ -196,6 +205,13 @@ impl Scene {
 	pub fn render(
 		&mut self,
 	) {
+		if let Some(camera_state) = self.camera_state.as_mut() {
+			vpb::gmuc_ref!(camera_state).build_view(
+				&self.program_data,
+				&self.input_state,
+				&self.render_state,
+			);
+		}
 		let present_index = self.acquire_next_image();
 		self.render_state.frame = present_index;
 		self.sync_fences(
@@ -355,7 +371,16 @@ impl Scene {
 		self.setup_submit(
 			&depth_image,
 		);
+		self.build_perspective();
 	}}
+
+	pub fn build_perspective(
+		&mut self,
+	) {
+		if let Some(camera_state) = self.camera_state.as_mut() {
+			vpb::gmuc_ref!(camera_state).build_perspective(&self.program_data);
+		}
+	}
 
 	fn destroy_swapchain(
 		&mut self,

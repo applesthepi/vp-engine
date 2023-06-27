@@ -2,47 +2,48 @@ use std::sync::Arc;
 
 use ash::vk;
 
-use crate::{Object, ProgramData, EnginePipeline, pf, render_state, InputState, RenderState};
+use crate::{ProgramData, EnginePipeline, pf, InputState, RenderState, rendering::RenderingState, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::UpdateState, ObjectStateBuffers};
 
 pub struct Bucket {
 	pub name: String,
-	// pub pipeline: Arc<dyn vpb::Pipeline>,
 	pub engine_pipeline: Arc<dyn EnginePipeline>,
 	pub program_data: ProgramData,
-	objects: Vec<Arc<dyn Object>>,
+	objects_rs: Vec<Arc<dyn RenderingState>>,
+	objects_us: Vec<Arc<dyn UpdateState>>,
 }
 
 impl Bucket {
 	pub fn new(
 		name: &str,
-		// pipeline: Arc<dyn vpb::Pipeline>,
 		pipeline_engine: Arc<dyn EnginePipeline>,
 		program_data: ProgramData,
 	) -> Self {
 		let name = name.to_string();
-		let objects: Vec<Arc<dyn Object>> = Vec::with_capacity(1024);
+		let objects_rs: Vec<Arc<dyn RenderingState>> = Vec::with_capacity(1024);
+		let objects_us: Vec<Arc<dyn UpdateState>> = Vec::with_capacity(1024);
 		Self {
 			name,
-			// pipeline,
 			engine_pipeline: pipeline_engine,
 			program_data,
-			objects,
+			objects_rs,
+			objects_us,
 		}
 	}
 
-	pub fn get_object(
+	pub fn get_static_object(
 		&self,
 		name: &str,
-	) -> Arc<dyn Object> {
-		self.objects.iter().find(
+	) -> Arc<dyn RenderingState> {
+		self.objects_rs.iter().find(
 			|x|
-			x.state().name == name
+			x.sub_state().name == name
 		).expect(format!("no object with name \"{}\" inside bucket \"{}\"", name, self.name).as_str()).clone()
 	}
 
-	pub fn add_object(
+	pub fn add_static_object(
 		&mut self,
-		mut object: Arc<dyn Object>,
+		mut static_state: Arc<StaticState>,
+		update_state: Arc<dyn UpdateState>,
 	) {
 		let pipeline_info = self.engine_pipeline.get_pipeline_info();
 		let mut block_states = pipeline_info.block_states.clone();
@@ -50,11 +51,29 @@ impl Bucket {
 			&self.program_data,
 			&self.engine_pipeline,
 		));
-		let wa_object = vpb::gmuc!(object);
-		let mut wa_object_state = wa_object.state();
-		let wa_object_state = vpb::gmuc!(wa_object_state);
-		wa_object_state.block_states = Some(block_states);
-		self.objects.push(object);
+		let wa_object_state = vpb::gmuc!(static_state);
+		vpb::gmuc!(wa_object_state.sub_state).block_states = Some(block_states);
+		drop(wa_object_state);
+		self.objects_rs.push(static_state);
+		self.objects_us.push(update_state);
+	}
+
+	pub fn add_dynamic_object(
+		&mut self,
+		mut dynamic_state: Arc<DynamicState>,
+		update_state: Arc<dyn UpdateState>,
+	) {
+		let pipeline_info = self.engine_pipeline.get_pipeline_info();
+		let mut block_states = pipeline_info.block_states.clone();
+		block_states.extend(pf::create_object_block_states(
+			&self.program_data,
+			&self.engine_pipeline,
+		));
+		let wa_object_state = vpb::gmuc!(dynamic_state);
+		vpb::gmuc!(wa_object_state.sub_state).block_states = Some(block_states);
+		drop(wa_object_state);
+		self.objects_rs.push(dynamic_state);
+		self.objects_us.push(update_state);
 	}
 
 	pub fn update_blocks(
@@ -67,8 +86,9 @@ impl Bucket {
 			input_state,
 			render_state,
 		);
-		for object in self.objects.iter_mut() {
-			vpb::gmuc_ref!(object).update_block_states(
+		for object in self.objects_us.iter_mut() {
+			let wa_object = vpb::gmuc_ref!(object);
+			wa_object.update_block_states(
 				&self.program_data.device,
 				render_state.frame,
 				self.program_data.frame_count,
@@ -97,12 +117,12 @@ impl Bucket {
 			0,
 			&self.engine_pipeline.get_pipeline_info().scissor,
 		);
-		for object in self.objects.iter() {
-			let object_state = object.state();
-			let block_states = &object_state.block_states.as_ref().expect(
+		for object in self.objects_rs.iter() {
+			let mut sub_state = object.sub_state();
+			let sub_state = vpb::gmuc!(sub_state);
+			let block_states = &sub_state.block_states.as_ref().expect(
 				"attempting to bind no block states during rendering"
 			);
-			// TODO: USE
 			let block_state_layouts: Vec<vk::DescriptorSet> = block_states.iter().map(
 				|x| {
 					x.frame_sets[frame].set
@@ -116,18 +136,36 @@ impl Bucket {
 				&block_state_layouts,
 				&[],
 			);
-			object_state.bind_buffers(
+			object.bind_buffers(
 				&self.program_data,
 				&command_buffer,
 			);
-			device.device.cmd_draw_indexed(
-				command_buffer,
-				object_state.index_count(),
-				1,
-				0,
-				0,
-				1,
-			);
+			match &object.sub_state().buffers {
+				ObjectStateBuffers::GOIndexed(
+					_,
+					index_buffer,
+				) => {
+					device.device.cmd_draw_indexed(
+						command_buffer,
+						index_buffer.index_count as u32,
+						1,
+						0,
+						0,
+						1,
+					);
+				},
+				ObjectStateBuffers::GOIndirect(
+					indirect_buffer,
+				) => {
+					device.device.cmd_draw_indexed_indirect(
+						command_buffer,
+						indirect_buffer.indirect_gpu,
+						0,
+						indirect_buffer.indirect_count as u32,
+						std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32,
+					);
+				},
+			}
 		}
 	}}
 
@@ -140,10 +178,10 @@ impl Bucket {
 			let block_state = vpb::gmuc!(*block_state);
 			block_state.destroy_memory(&self.program_data.device);
 		}
-		for object in self.objects.iter() {
-			let mut state = object.state();
-			let wa_state = vpb::gmuc!(state);
-			let block_states = wa_state.block_states.as_mut().expect(
+		for object in self.objects_rs.iter() {
+			let mut state = object.sub_state();
+			let state = vpb::gmuc!(state);
+			let block_states = state.block_states.as_mut().expect(
 				"attempting to recreate block states when there are none",
 			);
 			for block_state in block_states.iter_mut().skip(1) {
@@ -167,10 +205,10 @@ impl Bucket {
 				self.program_data.frame_count,
 			);
 		}
-		for object in self.objects.iter() {
-			let mut state = object.state();
-			let wa_state = vpb::gmuc!(state);
-			let block_states = wa_state.block_states.as_mut().expect(
+		for object in self.objects_rs.iter() {
+			let mut state = object.sub_state();
+			let state = vpb::gmuc!(state);
+			let block_states = state.block_states.as_mut().expect(
 				"attempting to recreate block states when there are none",
 			);
 			for block_state in block_states.iter_mut().skip(1) {
