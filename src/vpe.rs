@@ -7,7 +7,6 @@ pub use program::*;
 mod scene;
 pub use scene::*;
 pub mod pipelines;
-// pub use pipelines::*;
 mod vertex;
 pub use vertex::*;
 mod objects;
