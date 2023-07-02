@@ -6,6 +6,7 @@ edition = "2021"
 [lib]
 name = "vpe"
 path = "src/vpe.rs"
+crate-type = ["staticlib"]
 
 [toolchain]
 channel = "nightly"
@@ -13,7 +14,7 @@ channel = "nightly"
 [profile.dev]
 opt-level = 0
 [profile.dev.package."*"]
-opt-level = 3
+opt-level = 0
 [profile.dev.package.vpb]
 opt-level = 0
 
@@ -27,3 +28,7 @@ nalgebra = "0.31.4"
 bytemuck = "1.13.1"
 glm = "0.2.3"
 bitflags = "2.3.2"
+cxx = "1.0.97"
+
+[build-dependencies]
+cxx-build = "1.0.97"
