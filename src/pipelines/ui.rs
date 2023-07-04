@@ -33,7 +33,7 @@ impl PipelineUI {
 		});
 		let pipeline_info = Arc::new(PipelineInfo::new::<VertexUI>(
 			program_data,
-			"ui_lighting",
+			"ui_geometry",
 			true,
 			ViewportDepthRange::UI,
 			vk::PolygonMode::FILL,
