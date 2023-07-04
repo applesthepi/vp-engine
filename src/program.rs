@@ -1,6 +1,7 @@
 use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File, io::Read};
 
 use ash::vk::{Instance, self};
+use nalgebra::vector;
 use shaderc::{ShaderKind, CompileOptions};
 use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseButton}};
 
@@ -244,7 +245,7 @@ impl Program {
 				}
 			},
 			Event::WindowEvent { event: WindowEvent::CursorMoved { device_id, position, modifiers }, .. } => {
-				scene.input_state.mouse.position = [position.x as i32, position.y as i32];
+				scene.input_state.mouse.position = vector![position.x as i32, position.y as i32];
 			},
 			_ => {},
 		}

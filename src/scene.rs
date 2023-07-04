@@ -223,6 +223,7 @@ impl Scene {
 		let elapsed_micros = self.render_state_local.delta_timer.elapsed().as_micros();
 		self.render_state_local.delta_timer = Instant::now();
 		self.render_state.delta_time = elapsed_micros as f32 / 1_000_000.0;
+		self.render_state.delta_time = self.render_state.delta_time.min(1.0);
 		// println!("{:.3}ms", self.render_state.delta_time * 1_000.0);
 		for bucket in self.buckets.iter_mut() {
 			bucket.update_blocks(

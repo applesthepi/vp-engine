@@ -73,7 +73,7 @@ pub struct CameraState {
 	pub camera_postposition: Vector3<f32>,
 	pub camera_rotation: Vector2<f32>,
 	pub init_rotation_vector: Vector2<f32>,
-	pub init_mouse: [i32; 2],
+	pub init_mouse: Vector2<i32>,
 	pub was_down: bool,
 }
 
