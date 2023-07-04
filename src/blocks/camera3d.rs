@@ -4,16 +4,16 @@ use ash::vk;
 use nalgebra::{Matrix4, vector, Vector3, Vector2, Perspective3};
 use winit::event::VirtualKeyCode;
 
-use crate::{ProgramData, InputState, RenderState};
+use crate::{ProgramData, InputState, RenderState, Camera};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct BlockCamera {
+pub struct BlockCamera3d {
 	pub view: Matrix4<f32>,
 	pub projection: Matrix4<f32>,
 }
 
-impl Default for BlockCamera {
+impl Default for BlockCamera3d {
 	fn default() -> Self {
 		Self {
 			view: Matrix4::identity(),
@@ -22,7 +22,7 @@ impl Default for BlockCamera {
 	}
 }
 
-impl vpb::Block for BlockCamera {
+impl vpb::Block for BlockCamera3d {
 	fn create_block_state(
 		device: &vpb::Device,
 		instance: &vpb::Instance,
@@ -40,7 +40,7 @@ impl vpb::Block for BlockCamera {
 			frame_count,
 			binding,
 			set,
-			size_of::<BlockCamera>(),
+			size_of::<BlockCamera3d>(),
 			1,
 		))
 	}
@@ -67,8 +67,8 @@ impl vpb::Block for BlockCamera {
 }
 
 #[derive(Default, Debug)]
-pub struct CameraState {
-	pub block: BlockCamera,
+pub struct CameraState3d {
+	pub block: BlockCamera3d,
 	pub camera_preposition: Vector3<f32>,
 	pub camera_postposition: Vector3<f32>,
 	pub camera_rotation: Vector2<f32>,
@@ -77,7 +77,7 @@ pub struct CameraState {
 	pub was_down: bool,
 }
 
-impl CameraState {
+impl CameraState3d {
 	pub fn new(
 		position: [f32; 3],
 	) -> Self {
@@ -99,8 +99,10 @@ impl CameraState {
 			..Default::default()
 		}
 	}
+}
 
-	pub fn build_perspective(
+impl Camera for CameraState3d {
+	fn build_perspective(
 		&mut self,
 		program_data: &ProgramData,
 	) {
@@ -113,7 +115,7 @@ impl CameraState {
 		self.block.projection[(1, 1)] *= -1.0;
 	}
 
-	pub fn build_view(
+	fn build_view(
 		&mut self,
 		program_data: &ProgramData,
 		input_state: &InputState,
@@ -199,5 +201,18 @@ impl CameraState {
 		]);
 		let view_matrix = rotation_cam * translation;
 		self.block.view = view_matrix;
+	}
+
+	fn update(
+		&self,
+		device: &vpb::Device,
+		frame: Option<usize>,
+		block_state: &Arc<vpb::BlockState>,
+	) {
+		block_state.update(
+			device,
+			&self.block,
+			frame,
+		)
 	}
 }

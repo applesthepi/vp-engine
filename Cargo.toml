@@ -6,7 +6,6 @@ edition = "2021"
 [lib]
 name = "vpe"
 path = "src/vpe.rs"
-crate-type = ["staticlib"]
 
 [toolchain]
 channel = "nightly"

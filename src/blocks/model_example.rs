@@ -5,12 +5,12 @@ use nalgebra::{Vector4, Matrix4};
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct BlockModel {
+pub struct BlockModelExample {
 	pub model: Matrix4<f32>,
 	pub color: Vector4<f32>,
 }
 
-impl vpb::Block for BlockModel {
+impl vpb::Block for BlockModelExample {
 	fn create_block_state(
 		device: &vpb::Device,
 		instance: &vpb::Instance,
@@ -28,7 +28,7 @@ impl vpb::Block for BlockModel {
 			frame_count,
 			binding,
 			set,
-			size_of::<BlockModel>(),
+			size_of::<BlockModelExample>(),
 			1,
 		))
 	}
