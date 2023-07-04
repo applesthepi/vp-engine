@@ -1,3 +1,5 @@
+use nalgebra::Vector2;
+
 pub struct InputState {
 	pub mouse: MouseState,
 	pub down_keys: Vec<bool>,
@@ -5,8 +7,8 @@ pub struct InputState {
 
 #[derive(Default)]
 pub struct MouseState {
-	pub position: [i32; 2],
-	pub position_delta: [i32; 2],
+	pub position: Vector2<i32>,
+	pub position_delta: Vector2<i32>,
 	pub scroll_delta: i32,
 	pub left: bool,
 	pub middle: bool,
