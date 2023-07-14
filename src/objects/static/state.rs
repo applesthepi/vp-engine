@@ -16,12 +16,14 @@ impl StaticState {
 		program_data: &ProgramData,
 		name: String,
 		buffers: ObjectStateBuffers,
+		enabled: bool,
 	) -> Self {
 		Self {
 			sub_state: Arc::new(SubState {
 				name,
 				block_states: None,
 				buffers,
+				enabled,
 			}),
 			dirty_state: StaticDirtyState::all(),
 			bs_left: 0,

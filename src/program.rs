@@ -3,9 +3,9 @@ use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell,
 use ash::vk::{Instance, self};
 use nalgebra::vector;
 use shaderc::{ShaderKind, CompileOptions};
-use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseButton}};
+use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseButton, MouseScrollDelta}};
 
-use crate::{Scene, pipelines::ui::PipelineUI, EnginePipeline};
+use crate::{Scene, pipelines::ui_example::PipelineUIExample, EnginePipeline};
 
 mod macros;
 pub use macros::*;
@@ -32,10 +32,11 @@ pub struct ProgramData {
 }
 
 impl Program {
-	pub fn new(
+	pub fn new<FC>(
 		name: &str,
 		event_loop: &EventLoop<()>,
-	) -> Self {
+		initial_pipeline: (&str, FC),
+	) -> Self where FC: Fn(&ProgramData) -> Arc<dyn EnginePipeline> {
 		let mut window = vpb::Window::new(
 			name,
 			event_loop,
@@ -97,6 +98,7 @@ impl Program {
 		};
 		let (scene, frame_count) = Scene::new(
 			program_data.clone(),
+			initial_pipeline,
 		);
 		program_data.frame_count = frame_count;
 		Self {
@@ -195,6 +197,7 @@ impl Program {
 			Event::MainEventsCleared => {
 				fn_render(scene);
 				scene.render();
+				scene.input_state.mouse.scroll_delta = 0;
 			},
 			Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => {
 				let value = match input.state {
@@ -205,19 +208,23 @@ impl Program {
 					scene.input_state.down_keys[x as usize] = value;
 				}
 			},
+			Event::WindowEvent { event: WindowEvent::MouseWheel { device_id, delta, phase, modifiers }, .. } =>  {
+				match delta {
+					MouseScrollDelta::LineDelta(_, v) => {
+						scene.input_state.mouse.scroll_delta = *v as i32;
+					},
+					_ => {},
+				};
+			},
 			Event::WindowEvent { event: WindowEvent::MouseInput { device_id, state, button, modifiers }, .. } =>  {
 				match button {
 					MouseButton::Left => {
 						match state {
 							ElementState::Pressed => {
 								scene.input_state.mouse.left = true;
-								// wa_program.user_io.init_rotation_vector = wa_program.user_io.camera_rotation;
-								// wa_program.user_io.init_mouse = wa_program.user_io.mouse_position;
-								// wa_program.user_io.mouse_down = true;
 							},
 							ElementState::Released => {
 								scene.input_state.mouse.left = false;
-								// wa_program.user_io.mouse_down = false;
 							}
 						}
 					},

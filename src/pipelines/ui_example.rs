@@ -1,23 +1,24 @@
 use std::sync::Arc;
 
 use ash::vk;
-use nalgebra::Matrix4;
 
-use crate::{ViewportDepthRange, PipelineInfo, BlockCamera, ProgramData, BlockModel, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState};
+use crate::{ViewportDepthRange, PipelineInfo, BlockCamera2d, ProgramData, BlockModelExample, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState, CameraState2d, Camera};
 
-pub struct PipelineUI {
+pub struct PipelineUIExample {
 	pipeline_info: Arc<PipelineInfo>,
 	pipeline_block_structure: Arc<ObjectBlockStructure>,
 	object_block_structure: Arc<ObjectBlockStructure>,
+	camera: Arc<dyn Camera>,
 }
 
-impl PipelineUI {
+impl PipelineUIExample {
 	pub fn new(
 		program_data: &ProgramData,
+		camera: Arc<dyn Camera>,
 	) -> Self { unsafe {
 		let pipeline_block_structure = Arc::new(ObjectBlockStructure {
 			spawners: vec![
-				Box::new(vpb::BlockSpawner::<BlockCamera>::new(
+				Box::new(vpb::BlockSpawner::<BlockCamera2d>::new(
 					&program_data.device,
 					0, 0,
 				))
@@ -25,7 +26,7 @@ impl PipelineUI {
 		});
 		let object_block_structure = Arc::new(ObjectBlockStructure {
 			spawners: vec![
-				Box::new(vpb::BlockSpawner::<BlockModel>::new(
+				Box::new(vpb::BlockSpawner::<BlockModelExample>::new(
 					&program_data.device,
 					1, 1,
 				))
@@ -44,11 +45,12 @@ impl PipelineUI {
 			pipeline_info,
 			pipeline_block_structure,
 			object_block_structure,
+			camera,
 		}
 	}}
 }
 
-impl EnginePipeline for PipelineUI {
+impl EnginePipeline for PipelineUIExample {
 	fn get_pipeline_info(
 		&self,
 	) -> Arc<PipelineInfo> {
@@ -85,23 +87,10 @@ impl EnginePipeline for PipelineUI {
 		input_state: &InputState,
 		render_state: &RenderState,
 	) {
-		let view = Matrix4::identity();
-		let projection = Matrix4::new_orthographic(
-			0.0,
-			program_data.window.extent.width as f32,
-			0.0,
-			program_data.window.extent.height as f32,
-			-100.0,
-			100.0,
-		);
-		let camera_block = BlockCamera {
-			view,
-			projection,
-		};
-		self.pipeline_info.block_states[0].update(
+		self.camera.update(
 			&program_data.device,
-			&camera_block,
 			Some(render_state.frame),
+			&self.pipeline_info.block_states[0],
 		)
 	}
 }

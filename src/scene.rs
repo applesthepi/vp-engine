@@ -6,7 +6,7 @@ use ash::vk;
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
-use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui::PipelineUI, EnginePipeline, CameraState};
+use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui_example::PipelineUIExample, EnginePipeline, CameraState3d, Camera};
 
 pub struct Scene {
 	pub program_data: ProgramData,
@@ -19,13 +19,14 @@ pub struct Scene {
 	pub input_state: InputState,
 	pub render_state: RenderState,
 	render_state_local: RenderStateLocal,
-	camera_state: Option<Arc<CameraState>>,
+	pub camera: Option<Arc<dyn Camera>>,
 }
 
 impl Scene {
-	pub fn new(
+	pub fn new<FC>(
 		mut program_data: ProgramData,
-	) -> (Self, usize) { unsafe {
+		initial_pipeline: (&str, FC),
+	) -> (Self, usize) where FC: Fn(&ProgramData) -> Arc<dyn EnginePipeline> { unsafe {
 		let semaphore_create_info = vk::SemaphoreCreateInfo::builder().build();
 		let semaphore_present = program_data.device.device.create_semaphore(
 			&semaphore_create_info,
@@ -59,13 +60,12 @@ impl Scene {
 			render_state_local: RenderStateLocal {
 				delta_timer: Instant::now(),
 			},
-			camera_state: None,
+			camera: None,
 		};
-		scene.add_bucket("ui", |program_data| {
-			Arc::new(PipelineUI::new(
-				program_data,
-			))
-		});
+		scene.add_bucket(
+			initial_pipeline.0,
+			initial_pipeline.1,
+		);
 		scene.setup_submit(
 			&depth_image
 		);
@@ -74,9 +74,11 @@ impl Scene {
 
 	pub fn set_camera_state(
 		&mut self,
-		camera_state: Arc<CameraState>,
+		camera: Arc<dyn Camera>,
 	) {
-		self.camera_state = Some(camera_state);
+		self.camera = Some(camera);
+		self.build_perspective();
+		self.build_view();
 	}
 
 	pub fn create_framebuffers(
@@ -205,13 +207,7 @@ impl Scene {
 	pub fn render(
 		&mut self,
 	) {
-		if let Some(camera_state) = self.camera_state.as_mut() {
-			vpb::gmuc_ref!(camera_state).build_view(
-				&self.program_data,
-				&self.input_state,
-				&self.render_state,
-			);
-		}
+		self.build_view();
 		let present_index = self.acquire_next_image();
 		self.render_state.frame = present_index;
 		self.sync_fences(
@@ -378,8 +374,20 @@ impl Scene {
 	pub fn build_perspective(
 		&mut self,
 	) {
-		if let Some(camera_state) = self.camera_state.as_mut() {
+		if let Some(camera_state) = self.camera.as_mut() {
 			vpb::gmuc_ref!(camera_state).build_perspective(&self.program_data);
+		}
+	}
+
+	pub fn build_view(
+		&mut self,
+	) {
+		if let Some(camera_state) = self.camera.as_mut() {
+			vpb::gmuc_ref!(camera_state).build_view(
+				&self.program_data,
+				&self.input_state,
+				&self.render_state,
+			);
 		}
 	}
 

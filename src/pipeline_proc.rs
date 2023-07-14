@@ -78,13 +78,7 @@ fn create_pipeline<V: vpb::Vertex>(
 	pipeline_block_structure: &Arc<ObjectBlockStructure>,
 	object_block_structure: &Arc<ObjectBlockStructure>,
 ) -> (vk::Pipeline, vk::PipelineLayout, [vk::Viewport; 1], [vk::Rect2D; 1]) { unsafe {
-	let binding_descriptions = [
-		vk::VertexInputBindingDescription::builder()
-			.binding(0)
-			.stride(V::stride())
-			.input_rate(vk::VertexInputRate::VERTEX)
-			.build(),
-	];
+	let binding_descriptions = V::binding_descriptions();
 	let attribute_descriptions = V::attribute_descriptions();
 	let input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
 		.vertex_attribute_descriptions(&attribute_descriptions)
