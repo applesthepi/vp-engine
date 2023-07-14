@@ -19,3 +19,5 @@ mod input_state;
 pub use input_state::*;
 mod render_state;
 pub use render_state::*;
+mod bindings;
+pub use bindings::*;

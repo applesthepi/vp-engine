@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use nalgebra::vector;
 use winit::event_loop::EventLoop;
 
-use crate::Program;
+use crate::{Program, pipelines::ui_example::PipelineUIExample, CameraState2d};
 
 use super::cxx_program::ProgramContext;
 
@@ -17,9 +18,19 @@ impl ProgramHandler {
 		program_context: Box<ProgramContext>,
 	) -> Self {
 		let event_loop = EventLoop::new();
+		let camera_state = Arc::new(CameraState2d::new(
+			vector![0.0, 0.0],
+		));
 		let program = Program::new(
 			&program_context.name,
 			&event_loop,
+			("tiles",
+			|program_data| {
+				Arc::new(PipelineUIExample::new(
+					program_data,
+					camera_state.clone(),
+				))
+			}),
 		);
 		Self {
 			program_context,
