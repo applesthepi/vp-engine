@@ -223,4 +223,11 @@ impl Camera for CameraState2d {
 			frame,
 		)
 	}
+
+	fn get_view(
+		&self,
+	) -> (Matrix4<f32>, f32) {
+		let translate_scale_dynamic = self.max_zoom / (self.postdistance as f32);
+		(self.block.view, translate_scale_dynamic)
+	}
 }

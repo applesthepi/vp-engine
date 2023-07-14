@@ -6,6 +6,7 @@ mod camera2d;
 pub use camera2d::*;
 mod model_example;
 pub use model_example::*;
+use nalgebra::Matrix4;
 
 use crate::{ProgramData, InputState, RenderState};
 
@@ -28,4 +29,8 @@ pub trait Camera {
 		frame: Option<usize>,
 		block_state: &Arc<vpb::BlockState>,
 	);
+
+	fn get_view(
+		&self,
+	) -> (Matrix4<f32>, f32);
 }

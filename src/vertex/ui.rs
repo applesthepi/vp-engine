@@ -15,6 +15,17 @@ impl vpb::Vertex for VertexUI {
 		mem::size_of::<VertexUI>() as u32
 	}
 
+	fn binding_descriptions(
+	) -> Vec<vk::VertexInputBindingDescription> {
+		vec![
+			vk::VertexInputBindingDescription::builder()
+				.binding(0)
+				.stride(VertexUI::stride())
+				.input_rate(vk::VertexInputRate::VERTEX)
+				.build(),
+		]
+	}
+
 	fn attribute_descriptions(
 	) -> Vec<vk::VertexInputAttributeDescription> {
 		vec![

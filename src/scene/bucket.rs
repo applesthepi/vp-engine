@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ash::vk;
 
-use crate::{ProgramData, EnginePipeline, pf, InputState, RenderState, rendering::RenderingState, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::UpdateState, ObjectStateBuffers};
+use crate::{ProgramData, EnginePipeline, pf, InputState, RenderState, rendering::{RenderingState, sub}, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::UpdateState, ObjectStateBuffers};
 
 pub struct Bucket {
 	pub name: String,
@@ -119,6 +119,9 @@ impl Bucket {
 		);
 		for object in self.objects_rs.iter() {
 			let mut sub_state = object.sub_state();
+			if !sub_state.enabled {
+				continue;
+			}
 			let sub_state = vpb::gmuc!(sub_state);
 			let block_states = &sub_state.block_states.as_ref().expect(
 				"attempting to bind no block states during rendering"
@@ -151,7 +154,7 @@ impl Bucket {
 						1,
 						0,
 						0,
-						1,
+						0,
 					);
 				},
 				ObjectStateBuffers::GOIndirect(
@@ -163,6 +166,18 @@ impl Bucket {
 						0,
 						indirect_buffer.indirect_count as u32,
 						std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32,
+					);
+				},
+				ObjectStateBuffers::GOInstanced(
+					instance_buffer,
+				) => {
+					device.device.cmd_draw_indexed(
+						command_buffer,
+						instance_buffer.index_count as u32,
+						instance_buffer.instance_count as u32,
+						0,
+						0,
+						0,
 					);
 				},
 			}

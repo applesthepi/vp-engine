@@ -39,20 +39,22 @@ pub trait ObjectStatic {
 		frame_count: usize,
 	) {
 		let mut state = self.state();
-		let dirty_state = state.as_ref().dirty_state;
-		let bs_left = &mut vpb::gmuc!(state).bs_left;
-		if bit_compare!(dirty_state, StaticDirtyState::VIB) {
+		let state = vpb::gmuc!(state);
+		let dirty_state = &mut state.dirty_state;
+		let bs_left = &mut state.bs_left;
+		if bit_compare!(*dirty_state, StaticDirtyState::VIB) {
 			self.update_vib(device);
 		}
-		let bs_state = bit_compare!(dirty_state, StaticDirtyState::BS);
+		let bs_state = bit_compare!(*dirty_state, StaticDirtyState::BS);
 		if bs_state || *bs_left > 0 {
 			self.update_bs(device, frame);
 			if bs_state {
 				*bs_left = frame_count as u8 - 1;
+
 			} else {
 				*bs_left -= 1;
 			}
 		}
-		vpb::gmuc!(self.state()).dirty_state = StaticDirtyState::empty();
+		*dirty_state = StaticDirtyState::empty();
 	}
 }

@@ -6,6 +6,7 @@ use crate::ObjectStateBuffers;
 /// state regardless of object type.
 pub struct SubState {
 	pub name: String,
+	pub enabled: bool,
 	pub block_states: Option<Vec<Arc<vpb::BlockState>>>,
 	pub buffers: ObjectStateBuffers,
 }

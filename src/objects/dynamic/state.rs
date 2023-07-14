@@ -23,6 +23,7 @@ impl DynamicState {
 				name,
 				block_states: None,
 				buffers,
+				enabled: true,
 			}),
 			dirty_state: DynamicDirtyState::All,
 			bs_left: 0,

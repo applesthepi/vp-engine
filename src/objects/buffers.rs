@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
 use ash::vk;
-use vpb::{VertexBuffer, IndexBuffer};
+use vpb::{VertexBuffer, IndexBuffer, InstanceBuffer};
 
 use crate::ProgramData;
 
 /// Contains vertex and index buffers. Stores different configurations of those.
 pub enum ObjectStateBuffers {
+	// TODO: combine
 	GOIndexed(Arc<vpb::VB_GO_Indexed>, Arc<vpb::IB_GO_Indexed>),
 	GOIndirect(Arc<vpb::GO_Indirect>),
+	GOInstanced(Arc<vpb::GO_Instanced>),
 
 	// CGO(Arc<vpb::VertexBufferCGO<V>>, Arc<vpb::IndexBufferCGO>),
 }
@@ -76,7 +78,26 @@ pub fn bind_buffers(
 				&program_data.device,
 				*command_buffer,
 			);
-		}
+		},
+		ObjectStateBuffers::GOInstanced(
+			instance_buffer,
+		) => {
+			VertexBuffer::bind(
+				instance_buffer.as_ref(),
+				&program_data.device,
+				*command_buffer,
+			);
+			IndexBuffer::bind(
+				instance_buffer.as_ref(),
+				&program_data.device,
+				*command_buffer,
+			);
+			InstanceBuffer::bind(
+				instance_buffer.as_ref(),
+				&program_data.device,
+				*command_buffer,
+			);
+		},
 	}
 }}
 
@@ -94,6 +115,11 @@ pub fn index_count(
 			indirect_buffer,
 		) => {
 			indirect_buffer.index_count as u32
-		}
+		},
+		ObjectStateBuffers::GOInstanced(
+			instance_buffer,
+		) => {
+			instance_buffer.index_count as u32
+		},
 	}
 }

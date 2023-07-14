@@ -19,7 +19,7 @@ pub struct Scene {
 	pub input_state: InputState,
 	pub render_state: RenderState,
 	render_state_local: RenderStateLocal,
-	camera: Option<Arc<dyn Camera>>,
+	pub camera: Option<Arc<dyn Camera>>,
 }
 
 impl Scene {
@@ -78,6 +78,7 @@ impl Scene {
 	) {
 		self.camera = Some(camera);
 		self.build_perspective();
+		self.build_view();
 	}
 
 	pub fn create_framebuffers(
@@ -206,13 +207,7 @@ impl Scene {
 	pub fn render(
 		&mut self,
 	) {
-		if let Some(camera_state) = self.camera.as_mut() {
-			vpb::gmuc_ref!(camera_state).build_view(
-				&self.program_data,
-				&self.input_state,
-				&self.render_state,
-			);
-		}
+		self.build_view();
 		let present_index = self.acquire_next_image();
 		self.render_state.frame = present_index;
 		self.sync_fences(
@@ -320,7 +315,6 @@ impl Scene {
 		&mut self,
 		program_data: &mut ProgramData,
 	) { unsafe {
-		println!("resizing");
 		self.destroy_swapchain();
 		// SWAPCHAIN
 		Scene::create_swapchain(program_data);
@@ -382,6 +376,18 @@ impl Scene {
 	) {
 		if let Some(camera_state) = self.camera.as_mut() {
 			vpb::gmuc_ref!(camera_state).build_perspective(&self.program_data);
+		}
+	}
+
+	pub fn build_view(
+		&mut self,
+	) {
+		if let Some(camera_state) = self.camera.as_mut() {
+			vpb::gmuc_ref!(camera_state).build_view(
+				&self.program_data,
+				&self.input_state,
+				&self.render_state,
+			);
 		}
 	}
 

@@ -185,7 +185,6 @@ impl Program {
 				event: WindowEvent::Resized(size),
 				..
 			} => {
-				println!("window resized");
 				let wa_window = vpb::gmuc!(program_data.window);
 				wa_window.extent = vk::Extent2D {
 					width: size.width,

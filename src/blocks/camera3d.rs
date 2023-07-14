@@ -215,4 +215,10 @@ impl Camera for CameraState3d {
 			frame,
 		)
 	}
+
+	fn get_view(
+		&self,
+	) -> (Matrix4<f32>, f32) {
+		(self.block.view, 1.0)
+	}
 }
