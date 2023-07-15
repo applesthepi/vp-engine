@@ -6,7 +6,7 @@ edition = "2021"
 [lib]
 name = "vpe"
 path = "src/vpe.rs"
-crate-type = ["staticlib"]
+crate-type = ["lib"]
 
 [toolchain]
 channel = "nightly"
@@ -28,7 +28,3 @@ nalgebra = "0.31.4"
 bytemuck = "1.13.1"
 glm = "0.2.3"
 bitflags = "2.3.2"
-cxx = "1.0.97"
-
-[build-dependencies]
-cxx-build = "1.0.97"
