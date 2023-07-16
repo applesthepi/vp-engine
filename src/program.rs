@@ -10,6 +10,7 @@ use crate::{Scene, pipelines::ui_example::PipelineUIExample, EnginePipeline};
 mod macros;
 pub use macros::*;
 
+#[derive(Copy, Clone)]
 pub enum TickResult {
 	CONTINUE,
 	RENDER,
