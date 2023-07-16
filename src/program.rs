@@ -1,14 +1,20 @@
 use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File, io::Read};
 
 use ash::vk::{Instance, self};
+use glfw::{Key, Action, MouseButton};
 use nalgebra::vector;
 use shaderc::{ShaderKind, CompileOptions};
-use winit::{event_loop::{ControlFlow, EventLoop}, event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, MouseButton, MouseScrollDelta}};
 
 use crate::{Scene, pipelines::ui_example::PipelineUIExample, EnginePipeline};
 
 mod macros;
 pub use macros::*;
+
+pub enum TickResult {
+	CONTINUE,
+	RENDER,
+	EXIT,
+}
 
 pub struct Program {
 	pub scene: Arc<Scene>,
@@ -34,12 +40,10 @@ pub struct ProgramData {
 impl Program {
 	pub fn new<FC>(
 		name: &str,
-		event_loop: &EventLoop<()>,
 		initial_pipeline: (&str, FC),
 	) -> Self where FC: Fn(&ProgramData) -> Arc<dyn EnginePipeline> {
 		let mut window = vpb::Window::new(
 			name,
-			event_loop,
 		);
 		let instance = vpb::Instance::new(
 			name,
@@ -107,156 +111,105 @@ impl Program {
 		}
 	}
 
-	pub fn run<FO, FC, FR>(
-		mut program_data: Arc<ProgramData>,
-		mut scene: Arc<Scene>,
-		event_loop: EventLoop<()>,
-		mut fn_open: FO,
-		mut fn_close: FC,
-		mut fn_render: FR,
-	) where
-	FO: FnMut(&mut Scene) + 'static,
-	FC: FnMut(&mut Scene) + 'static,
-	FR: FnMut(&mut Scene) + 'static { unsafe {
-		// let mut scene = self.scene.clone();
-		{
-			let scene = Arc::get_mut_unchecked(
-				&mut scene,
-			);
-			fn_open(scene);
+	pub fn tick_events(
+		&mut self,
+	) -> TickResult {
+		if self.program_data.window.window.should_close() {
+			return TickResult::EXIT;
 		}
-		// let c_program = program.clone();
-		event_loop.run(
-			move |event: Event<()>, _, control_flow: &mut ControlFlow| {
-				let program = Arc::get_mut_unchecked(
-					&mut program_data,
-				);
-				let scene = Arc::get_mut_unchecked(
-					&mut scene,
-				);
-				*control_flow = ControlFlow::Poll;
-				Program::event_match(
-					program,
-					scene,
-					&event,
-					control_flow,
-					// &mut self,
-					&mut fn_render,
-					&mut fn_close,
-				);
-			}
-		);
-	}}
+		let mut program_data = self.program_data.clone();
+		let mut scene = self.scene.clone();
+		for (_, event) in glfw::flush_messages(&self.program_data.window.events) {
+			match Program::tick_event(
+				&mut program_data,
+				&mut scene,
+				event,
+			) {
+				TickResult::CONTINUE => {},
+				TickResult::RENDER => { return TickResult::RENDER; },
+				TickResult::EXIT => { return TickResult::EXIT; },
+			};
+		}
+		TickResult::CONTINUE
+	}
 
-	fn event_match<FC, FR>(
-		// program: Rc<Program>,
+	fn tick_event(
 		program_data: &mut ProgramData,
-		scene: &mut Scene,
-		// mut self,
-		event: &Event<()>,
-		control_flow: &mut ControlFlow,
-		// scene: &mut Arc<Scene>,
-		// program
-		fn_render: &mut FR,
-		fn_close: &mut FC,
-	) where
-	FC: FnMut(&mut Scene) + 'static,
-	FR: FnMut(&mut Scene) + 'static { unsafe {
+		scene: &mut Arc<Scene>,
+		event: glfw::WindowEvent,
+	) -> TickResult {
+		let glfw_window = &mut vpb::gmuc!(program_data.window).window;
 		match event {
-			Event::WindowEvent {
-				event:
-					WindowEvent::CloseRequested |
-					WindowEvent::KeyboardInput {
-						input:
-							KeyboardInput {
-								state: ElementState::Pressed,
-								virtual_keycode: Some(VirtualKeyCode::Escape),
-								..
-							},
-						..
-					},
-				..
-			} => {
-				*control_flow = ControlFlow::Exit;
-				fn_close(scene);
-				scene.idle();
+			glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
+				glfw_window.set_should_close(true);
+				return TickResult::EXIT;
 			},
-			Event::WindowEvent {
-				event: WindowEvent::Resized(size),
-				..
-			} => {
-				let wa_window = vpb::gmuc!(program_data.window);
-				wa_window.extent = vk::Extent2D {
-					width: size.width,
-					height: size.height,
+			glfw::WindowEvent::Size(x, y) => {
+				let window = vpb::gmuc!(program_data.window);
+				let scene = vpb::gmuc_ref!(scene);
+				window.extent = vk::Extent2D {
+					width: x as u32,
+					height: y as u32,
 				};
 				scene.resize(
 					program_data,
 				);
-			}
-			Event::MainEventsCleared => {
-				fn_render(scene);
-				scene.render();
-				scene.input_state.mouse.scroll_delta = 0;
 			},
-			Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => {
-				let value = match input.state {
-					ElementState::Pressed => true,
-					ElementState::Released => false,
+			glfw::WindowEvent::Refresh => {
+				return TickResult::RENDER;
+				// TODO:
+				// fn_render(scene);
+				// scene.render();
+				// scene.input_state.mouse.scroll_delta = 0;
+			},
+			glfw::WindowEvent::Key(key, x, action, modifiers) => {
+				let scene = vpb::gmuc_ref!(scene);
+				match action {
+					Action::Press => { scene.input_state.down_keys[key as usize] = true; },
+					Action::Release => { scene.input_state.down_keys[key as usize] = false; },
+					_ => {},
 				};
-				if let Some(x) = input.virtual_keycode {
-					scene.input_state.down_keys[x as usize] = value;
-				}
 			},
-			Event::WindowEvent { event: WindowEvent::MouseWheel { device_id, delta, phase, modifiers }, .. } =>  {
-				match delta {
-					MouseScrollDelta::LineDelta(_, v) => {
-						scene.input_state.mouse.scroll_delta = *v as i32;
+			glfw::WindowEvent::Scroll(x, y) => {
+				let scene = vpb::gmuc_ref!(scene);
+				scene.input_state.mouse.scroll_delta = x as i32;
+			},
+			glfw::WindowEvent::MouseButton(button, action, modifiers) => {
+				let scene = vpb::gmuc_ref!(scene);
+				match button {
+					MouseButton::Button1 => {
+						match action {
+							Action::Press => { scene.input_state.mouse.left = true; },
+							Action::Release => { scene.input_state.mouse.left = false; },
+							_ => {},
+						};
+					},
+					MouseButton::Button2 => {
+						match action {
+							Action::Press => { scene.input_state.mouse.right = true; },
+							Action::Release => { scene.input_state.mouse.right = false; },
+							_ => {},
+						};
+					},
+					MouseButton::Button3 => {
+						match action {
+							Action::Press => { scene.input_state.mouse.middle = true; },
+							Action::Release => { scene.input_state.mouse.middle = false; },
+							_ => {},
+						};
 					},
 					_ => {},
 				};
 			},
-			Event::WindowEvent { event: WindowEvent::MouseInput { device_id, state, button, modifiers }, .. } =>  {
-				match button {
-					MouseButton::Left => {
-						match state {
-							ElementState::Pressed => {
-								scene.input_state.mouse.left = true;
-							},
-							ElementState::Released => {
-								scene.input_state.mouse.left = false;
-							}
-						}
-					},
-					MouseButton::Middle => {
-						match state {
-							ElementState::Pressed => {
-								scene.input_state.mouse.middle = true;
-							},
-							ElementState::Released => {
-								scene.input_state.mouse.middle = false;
-							}
-						}
-					},
-					MouseButton::Right => {
-						match state {
-							ElementState::Pressed => {
-								scene.input_state.mouse.right = true;
-							},
-							ElementState::Released => {
-								scene.input_state.mouse.right = false;
-							}
-						}
-					},
-					_ => {}
-				}
-			},
-			Event::WindowEvent { event: WindowEvent::CursorMoved { device_id, position, modifiers }, .. } => {
-				scene.input_state.mouse.position = vector![position.x as i32, position.y as i32];
+			glfw::WindowEvent::CursorPos(x, y) => {
+				let scene = vpb::gmuc_ref!(scene);
+				scene.input_state.mouse.position.x = x as i32;
+				scene.input_state.mouse.position.y = y as i32;
 			},
 			_ => {},
-		}
-	}}
+		};
+		TickResult::CONTINUE
+	}
 }
 
 impl ProgramData {

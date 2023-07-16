@@ -1,8 +1,8 @@
 use std::{mem::size_of, sync::Arc, f32::consts::{PI, FRAC_PI_2}};
 
 use ash::vk;
+use glfw::ffi;
 use nalgebra::{Matrix4, vector, Vector3, Vector2, Perspective3};
-use winit::event::VirtualKeyCode;
 
 use crate::{ProgramData, InputState, RenderState, Camera};
 
@@ -144,40 +144,40 @@ impl Camera for CameraState3d {
 		);
 		let rotation_cam = r_y_cam * r_x_cam;
 		let rotation_rot = r_x_rot * r_y_rot;
-		if input_state.down_keys[VirtualKeyCode::LShift as usize] {
+		if input_state.down_keys[ffi::KEY_LEFT_SHIFT as usize] {
 			move_speed *= 2.0;
 		}
-		if input_state.down_keys[VirtualKeyCode::W as usize] {
+		if input_state.down_keys[ffi::KEY_W as usize] {
 			let direction = rotation_rot.transform_vector(
 				&Vector3::z()
 			).scale(render_state.delta_time * move_speed);
 			self.camera_preposition += direction;
 		}
-		if input_state.down_keys[VirtualKeyCode::S as usize] {
+		if input_state.down_keys[ffi::KEY_S as usize] {
 			let direction = rotation_rot.transform_vector(
 				&-Vector3::z()
 			).scale(render_state.delta_time * move_speed);
 			self.camera_preposition += direction;
 		}
-		if input_state.down_keys[VirtualKeyCode::A as usize] {
+		if input_state.down_keys[ffi::KEY_A as usize] {
 			let direction = rotation_rot.transform_vector(
 				&-Vector3::x()
 			).scale(render_state.delta_time * move_speed);
 			self.camera_preposition += direction;
 		}
-		if input_state.down_keys[VirtualKeyCode::D as usize] {
+		if input_state.down_keys[ffi::KEY_D as usize] {
 			let direction = rotation_rot.transform_vector(
 				&Vector3::x()
 			).scale(render_state.delta_time * move_speed);
 			self.camera_preposition += direction;
 		}
-		if input_state.down_keys[VirtualKeyCode::Q as usize] {
+		if input_state.down_keys[ffi::KEY_Q as usize] {
 			let direction = Vector3::y().scale(
 				render_state.delta_time * move_speed
 			);
 			self.camera_preposition += direction;
 		}
-		if input_state.down_keys[VirtualKeyCode::E as usize] {
+		if input_state.down_keys[ffi::KEY_E as usize] {
 			let direction = -Vector3::y().scale(
 				render_state.delta_time * move_speed
 			);

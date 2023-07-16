@@ -3,7 +3,6 @@ use std::{mem::size_of, sync::Arc, f32::consts::{PI, FRAC_PI_2}, collections::{H
 use ash::vk;
 use nalgebra::{Matrix4, vector, Vector3, Vector2, Perspective3, Orthographic3, point, Point3};
 use crate::{ProgramData, InputState, RenderState, Camera};
-use winit::event::VirtualKeyCode;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
