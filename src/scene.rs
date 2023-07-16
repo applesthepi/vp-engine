@@ -2,7 +2,7 @@ mod bucket;
 
 use std::{sync::Arc, marker::PhantomData, time::Instant};
 
-use ash::vk;
+use ash::{vk, prelude::VkResult};
 pub use bucket::*;
 use vpb::{create_depth_image, create_presentation_images};
 
@@ -150,13 +150,13 @@ impl Scene {
 
 	pub fn acquire_next_image(
 		&self,
-	) -> usize { unsafe {
+	) -> VkResult<(u32, bool)> { unsafe {
 		self.program_data.swapchain.swapchain_loader.acquire_next_image(
 			self.program_data.swapchain.swapchain,
 			std::u64::MAX,
 			self.semaphore_present,
 			vk::Fence::null(),
-		).unwrap().0 as usize
+		)
 	}}
 
 	pub fn setup_submit(
@@ -197,10 +197,13 @@ impl Scene {
 		self.program_data.command_buffer_setup.close(
 			&self.program_data.device,
 		);
-		self.submit(
+		match self.submit(
 			&self.program_data.command_buffer_setup,
 			false,
-		);
+		) {
+			Ok(_) => {},
+			Err(_) => { println!("invalid khr during setup"); },
+		}
 		self.idle();
 	}}
 
@@ -208,7 +211,22 @@ impl Scene {
 		&mut self,
 	) {
 		self.build_view();
-		let present_index = self.acquire_next_image();
+		let resize: bool;
+		let present_index = match self.acquire_next_image() {
+			Ok((idx, _)) => {
+				resize = false;
+				idx as usize
+			},
+			Err(_) => {
+				resize = true;
+				0
+			},
+		};
+		if resize {
+			let mut program_data = self.program_data.clone();
+			self.resize(&mut program_data);
+			return;
+		}
 		self.render_state.frame = present_index;
 		self.sync_fences(
 			&self.program_data.command_buffer_draw,
@@ -247,10 +265,17 @@ impl Scene {
 		self.program_data.command_buffer_draw.close(
 			&self.program_data.device,
 		);
-		self.submit(
+		match self.submit(
 			&self.program_data.command_buffer_draw,
 			true,
-		);
+		) {
+			Ok(_) => {},
+			Err(_) => {
+				let mut program_data = self.program_data.clone();
+				self.resize(&mut program_data);
+				return;
+			},
+		}
 		self.present(present_index);
 	}
 
@@ -258,7 +283,7 @@ impl Scene {
 		&self,
 		command_buffer: &vpb::CommandBuffer,
 		use_semaphores: bool,
-	) { unsafe {
+	) -> VkResult<()> { unsafe {
 		if use_semaphores {
 			let command_buffers = vec![command_buffer.command_buffer];
 			let submit_info = vk::SubmitInfo::builder()
@@ -271,7 +296,7 @@ impl Scene {
 				command_buffer.present_queue,
 				&[submit_info],
 				command_buffer.fence_submit,
-			).unwrap();
+			)
 		} else {
 			let command_buffers = vec![command_buffer.command_buffer];
 			let mut submit_info = vk::SubmitInfo::builder()
@@ -286,7 +311,7 @@ impl Scene {
 				command_buffer.present_queue,
 				&[submit_info],
 				command_buffer.fence_submit,
-			).unwrap();
+			)
 		}
 	}}
 
@@ -299,10 +324,13 @@ impl Scene {
 			.swapchains(&[self.program_data.swapchain.swapchain])
 			.image_indices(&[present_index as u32])
 			.build();
-		self.program_data.swapchain.swapchain_loader.queue_present(
+		match self.program_data.swapchain.swapchain_loader.queue_present(
 			self.program_data.command_buffer_draw.present_queue,
 			&present_info,
-		).unwrap();
+		) {
+			Ok(_) => {},
+			Err(_) => {},
+		};
 	}}
 
 	pub fn idle(
@@ -315,6 +343,13 @@ impl Scene {
 		&mut self,
 		program_data: &mut ProgramData,
 	) { unsafe {
+		loop {
+			let size = program_data.window.window.get_framebuffer_size();
+			if size.0 > 0 && size.1 > 0 {
+				break;
+			}
+			vpb::gmuc!(program_data.window).glfw.wait_events();
+		}
 		self.destroy_swapchain();
 		// SWAPCHAIN
 		Scene::create_swapchain(program_data);
@@ -365,6 +400,8 @@ impl Scene {
 			&program_data.command_pool,
 			&program_data.swapchain,
 		);
+		*vpb::gmuc!(self.program_data.command_buffer_draw) = command_buffer_draw;
+		*vpb::gmuc!(self.program_data.command_buffer_setup) = command_buffer_setup;
 		self.setup_submit(
 			&depth_image,
 		);

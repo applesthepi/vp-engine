@@ -120,6 +120,7 @@ impl Program {
 		}
 		let mut program_data = self.program_data.clone();
 		let mut scene = self.scene.clone();
+		vpb::gmuc!(self.program_data.window).glfw.poll_events();
 		for (_, event) in glfw::flush_messages(&self.program_data.window.events) {
 			match Program::tick_event(
 				&mut program_data,
@@ -131,7 +132,7 @@ impl Program {
 				TickResult::EXIT => { return TickResult::EXIT; },
 			};
 		}
-		TickResult::CONTINUE
+		TickResult::RENDER
 	}
 
 	fn tick_event(
@@ -157,19 +158,19 @@ impl Program {
 				);
 			},
 			glfw::WindowEvent::Refresh => {
-				return TickResult::RENDER;
-				// TODO:
-				// fn_render(scene);
-				// scene.render();
-				// scene.input_state.mouse.scroll_delta = 0;
+				let scene = vpb::gmuc_ref!(scene);
+				scene.resize(program_data);
+				return TickResult::CONTINUE;
 			},
 			glfw::WindowEvent::Key(key, x, action, modifiers) => {
-				let scene = vpb::gmuc_ref!(scene);
-				match action {
-					Action::Press => { scene.input_state.down_keys[key as usize] = true; },
-					Action::Release => { scene.input_state.down_keys[key as usize] = false; },
-					_ => {},
-				};
+				if (key as i32) >= (Key::Space as i32) && (key as i32) < (Key::GraveAccent as i32) {
+					let scene = vpb::gmuc_ref!(scene);
+					match action {
+						Action::Press => { scene.input_state.down_keys[key as usize] = true; },
+						Action::Release => { scene.input_state.down_keys[key as usize] = false; },
+						_ => {},
+					};
+				}
 			},
 			glfw::WindowEvent::Scroll(x, y) => {
 				let scene = vpb::gmuc_ref!(scene);
