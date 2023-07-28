@@ -135,8 +135,19 @@ fn create_pipeline<V: vpb::Vertex>(
 		|x|
 		x.layout()
 	));
-	let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
-		.set_layouts(&descriptor_set_layouts);
+	let push_constants = (pipeline_info.push_constants)();
+	let pipeline_layout_info: vk::PipelineLayoutCreateInfo;
+	if push_constants.is_empty() {
+		pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+		.set_layouts(&descriptor_set_layouts)
+		.build();
+	} else {
+		println!("loading push constants {:?}", push_constants);
+		pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+		.set_layouts(&descriptor_set_layouts)
+		.push_constant_ranges(&push_constants)
+		.build();
+	}
 	let pipeline_layout = program_data.device.device.create_pipeline_layout(
 		&pipeline_layout_info,
 		None,

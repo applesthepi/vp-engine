@@ -23,6 +23,7 @@ pub trait ObjectStatic {
 
 	fn update_vib(
 		&mut self,
+		instance: &vpb::Instance,
 		device: &vpb::Device,
 	);
 
@@ -34,6 +35,7 @@ pub trait ObjectStatic {
 
 	fn update_block_states(
 		&mut self,
+		instance: &vpb::Instance,
 		device: &vpb::Device,
 		frame: usize,
 		frame_count: usize,
@@ -43,7 +45,7 @@ pub trait ObjectStatic {
 		let dirty_state = &mut state.dirty_state;
 		let bs_left = &mut state.bs_left;
 		if bit_compare!(*dirty_state, StaticDirtyState::VIB) {
-			self.update_vib(device);
+			self.update_vib(instance, device);
 		}
 		let bs_state = bit_compare!(*dirty_state, StaticDirtyState::BS);
 		if bs_state || *bs_left > 0 {

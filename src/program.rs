@@ -1,4 +1,4 @@
-use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File, io::Read};
+use std::{sync::Arc, marker::PhantomData, rc::Rc, borrow::Borrow, cell::RefCell, fs::File, io::Read, time::{Duration, Instant}};
 
 use ash::vk::{Instance, self};
 use glfw::{Key, Action, MouseButton};
@@ -20,6 +20,7 @@ pub enum TickResult {
 pub struct Program {
 	pub scene: Arc<Scene>,
 	pub program_data: ProgramData,
+	// pub images: Vec<vk::Image>,
 }
 
 #[derive(Clone)]
@@ -118,6 +119,7 @@ impl Program {
 		if self.program_data.window.window.should_close() {
 			return TickResult::EXIT;
 		}
+		vpb::gmuc!(self.scene).input_state.mouse.scroll_delta = 0;
 		let mut program_data = self.program_data.clone();
 		let mut scene = self.scene.clone();
 		vpb::gmuc!(self.program_data.window).glfw.poll_events();
@@ -170,11 +172,32 @@ impl Program {
 						Action::Release => { scene.input_state.down_keys[key as usize] = false; },
 						_ => {},
 					};
+				} else if key == Key::LeftShift {
+					let scene = vpb::gmuc_ref!(scene);
+					match action {
+						Action::Press => { scene.input_state.shift = true; },
+						Action::Release => { scene.input_state.shift = false; },
+						_ => {},
+					};
+				} else if key == Key::LeftControl {
+					let scene = vpb::gmuc_ref!(scene);
+					match action {
+						Action::Press => { scene.input_state.control = true; },
+						Action::Release => { scene.input_state.control = false; },
+						_ => {},
+					};
+				} else if key == Key::LeftAlt {
+					let scene = vpb::gmuc_ref!(scene);
+					match action {
+						Action::Press => { scene.input_state.alt = true; },
+						Action::Release => { scene.input_state.alt = false; },
+						_ => {},
+					};
 				}
 			},
 			glfw::WindowEvent::Scroll(x, y) => {
 				let scene = vpb::gmuc_ref!(scene);
-				scene.input_state.mouse.scroll_delta = x as i32;
+				scene.input_state.mouse.scroll_delta = y as i32;
 			},
 			glfw::WindowEvent::MouseButton(button, action, modifiers) => {
 				let scene = vpb::gmuc_ref!(scene);
@@ -182,7 +205,10 @@ impl Program {
 					MouseButton::Button1 => {
 						match action {
 							Action::Press => { scene.input_state.mouse.left = true; },
-							Action::Release => { scene.input_state.mouse.left = false; },
+							Action::Release => {
+								scene.input_state.mouse.left = false;
+								scene.input_state.mouse.last_left = Instant::now();
+							},
 							_ => {},
 						};
 					},

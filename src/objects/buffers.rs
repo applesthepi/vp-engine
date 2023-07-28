@@ -8,7 +8,7 @@ use crate::ProgramData;
 /// Contains vertex and index buffers. Stores different configurations of those.
 pub enum ObjectStateBuffers {
 	// TODO: combine
-	GOIndexed(Arc<vpb::VB_GO_Indexed>, Arc<vpb::IB_GO_Indexed>),
+	GOIndexed(Arc<vpb::GO_Indexed>),
 	GOIndirect(Arc<vpb::GO_Indirect>),
 	GOInstanced(Arc<vpb::GO_Instanced>),
 
@@ -53,14 +53,15 @@ pub fn bind_buffers(
 ) { unsafe {
 	match buffers {
 		ObjectStateBuffers::GOIndexed(
-			vertex_buffer,
-			index_buffer,
+			indexed_buffer,
 		) => {
-			vertex_buffer.bind(
+			VertexBuffer::bind(
+				indexed_buffer.as_ref(),
 				&program_data.device,
 				*command_buffer,
 			);
-			index_buffer.bind(
+			IndexBuffer::bind(
+				indexed_buffer.as_ref(),
 				&program_data.device,
 				*command_buffer,
 			);
@@ -106,10 +107,9 @@ pub fn index_count(
 ) -> u32 {
 	match buffers {
 		ObjectStateBuffers::GOIndexed(
-			_,
-			index_buffer,
+			indexed_buffer,
 		) => {
-			index_buffer.index_count as u32
+			indexed_buffer.index_count as u32
 		},
 		ObjectStateBuffers::GOIndirect(
 			indirect_buffer,

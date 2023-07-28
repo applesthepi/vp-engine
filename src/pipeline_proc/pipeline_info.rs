@@ -14,6 +14,7 @@ pub struct PipelineInfo {
 	pub polygon_mode: vk::PolygonMode,
 	pub block_states: Vec<Arc<vpb::BlockState>>,
 	pub name: String,
+	pub push_constants: fn() -> Vec<vk::PushConstantRange>,
 }
 
 impl PipelineInfo {
@@ -25,6 +26,7 @@ impl PipelineInfo {
 		polygon_mode: vk::PolygonMode,
 		pipeline_block_structure: &Arc<ObjectBlockStructure>,
 		object_block_structure: &Arc<ObjectBlockStructure>,
+		push_constants: fn() -> Vec<vk::PushConstantRange>,
 	) -> Self {
 		let block_states = pipeline_block_structure.spawners.iter().map(
 			|x|
@@ -45,6 +47,7 @@ impl PipelineInfo {
 			polygon_mode,
 			block_states,
 			name: name.to_string(),
+			push_constants,
 		};
 		let (
 			pipeline,

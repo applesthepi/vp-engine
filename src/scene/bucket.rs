@@ -8,6 +8,7 @@ pub struct Bucket {
 	pub name: String,
 	pub engine_pipeline: Arc<dyn EnginePipeline>,
 	pub program_data: ProgramData,
+	object_names: Vec<String>,
 	objects_rs: Vec<Arc<dyn RenderingState>>,
 	objects_us: Vec<Arc<dyn UpdateState>>,
 }
@@ -25,6 +26,7 @@ impl Bucket {
 			name,
 			engine_pipeline: pipeline_engine,
 			program_data,
+			object_names: Vec::with_capacity(128),
 			objects_rs,
 			objects_us,
 		}
@@ -42,6 +44,7 @@ impl Bucket {
 
 	pub fn add_static_object(
 		&mut self,
+		name: String,
 		mut static_state: Arc<StaticState>,
 		update_state: Arc<dyn UpdateState>,
 	) {
@@ -54,12 +57,14 @@ impl Bucket {
 		let wa_object_state = vpb::gmuc!(static_state);
 		vpb::gmuc!(wa_object_state.sub_state).block_states = Some(block_states);
 		drop(wa_object_state);
+		self.object_names.push(name);
 		self.objects_rs.push(static_state);
 		self.objects_us.push(update_state);
 	}
 
 	pub fn add_dynamic_object(
 		&mut self,
+		name: String,
 		mut dynamic_state: Arc<DynamicState>,
 		update_state: Arc<dyn UpdateState>,
 	) {
@@ -72,26 +77,47 @@ impl Bucket {
 		let wa_object_state = vpb::gmuc!(dynamic_state);
 		vpb::gmuc!(wa_object_state.sub_state).block_states = Some(block_states);
 		drop(wa_object_state);
+		self.object_names.push(name);
 		self.objects_rs.push(dynamic_state);
 		self.objects_us.push(update_state);
+	}
+
+	pub fn remove_object(
+		&mut self,
+		name: String,
+	) {
+		let (i, _) = self.object_names.iter().enumerate().find(
+			|(_, obj_name)| {
+				**obj_name == name
+			}
+		).expect(format!("failed to find object {}", name).as_str());
+		// TODO: destroy related memory
+		self.object_names.swap_remove(i);
+		self.objects_rs.swap_remove(i);
+		self.objects_us.swap_remove(i);
 	}
 
 	pub fn update_blocks(
 		&mut self,
 		input_state: &InputState,
 		render_state: &RenderState,
+		command_buffer: &vk::CommandBuffer,
 	) {
 		vpb::gmuc!(self.engine_pipeline).update_block_states(
 			&self.program_data,
 			input_state,
 			render_state,
 		);
+		let pipeline_layout = self.engine_pipeline.get_pipeline_info().pipeline_layout;
 		for object in self.objects_us.iter_mut() {
 			let wa_object = vpb::gmuc_ref!(object);
 			wa_object.update_block_states(
+				&self.program_data.instance,
 				&self.program_data.device,
 				render_state.frame,
 				self.program_data.frame_count,
+				command_buffer,
+				&pipeline_layout,
 			);
 		}
 	}
@@ -145,12 +171,11 @@ impl Bucket {
 			);
 			match &object.sub_state().buffers {
 				ObjectStateBuffers::GOIndexed(
-					_,
-					index_buffer,
+					indexed_buffer,
 				) => {
 					device.device.cmd_draw_indexed(
 						command_buffer,
-						index_buffer.index_count as u32,
+						indexed_buffer.index_count as u32,
 						1,
 						0,
 						0,
@@ -162,7 +187,7 @@ impl Bucket {
 				) => {
 					device.device.cmd_draw_indexed_indirect(
 						command_buffer,
-						indirect_buffer.indirect_gpu,
+						indirect_buffer.indirect.memory.as_ref().unwrap_unchecked().0,
 						0,
 						indirect_buffer.indirect_count as u32,
 						std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32,

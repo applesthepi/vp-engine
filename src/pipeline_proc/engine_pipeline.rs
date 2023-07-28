@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use ash::vk;
+
 use crate::{PipelineInfo, ProgramData, InputState, RenderState, rendering::RenderingState};
 
 pub struct ObjectBlockStructure {

@@ -243,6 +243,7 @@ impl Scene {
 			bucket.update_blocks(
 				&self.input_state,
 				&self.render_state,
+				&self.program_data.command_buffer_draw.command_buffer,
 			);
 		}
 		self.program_data.render_pass.open(

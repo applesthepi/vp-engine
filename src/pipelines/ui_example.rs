@@ -40,6 +40,9 @@ impl PipelineUIExample {
 			vk::PolygonMode::FILL,
 			&pipeline_block_structure,
 			&object_block_structure,
+			|| {
+				vec![]
+			},
 		));
 		Self {
 			pipeline_info,
