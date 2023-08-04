@@ -3,8 +3,9 @@ use std::{mem::size_of, sync::Arc, f32::consts::{PI, FRAC_PI_2}};
 use ash::vk;
 use glfw::ffi;
 use nalgebra::{Matrix4, vector, Vector3, Vector2, Perspective3};
+use vpb::{DDType, DDTypeUniform, DescriptorDescription, BindingId, ProgramData};
 
-use crate::{ProgramData, InputState, RenderState, Camera};
+use crate::{InputState, RenderState, Camera};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -24,33 +25,32 @@ impl Default for BlockCamera3d {
 
 impl vpb::Block for BlockCamera3d {
 	fn create_block_state(
-		device: &vpb::Device,
-		instance: &vpb::Instance,
-		descriptor_pool: &vk::DescriptorPool,
+		program_data: &ProgramData,
 		descriptor_set_layout: &vk::DescriptorSetLayout,
 		frame_count: usize,
-		binding: u32,
-		set: u32,
+		binding: BindingId,
+		set: vpb::SetId,
 	) -> Arc<vpb::BlockState> {
 		Arc::new(vpb::BlockState::new(
-			device,
-			instance,
-			descriptor_pool,
+			program_data,
 			descriptor_set_layout,
 			frame_count,
-			binding,
 			set,
-			size_of::<BlockCamera3d>(),
-			1,
+			DescriptorDescription::new(&[
+				DDType::Uniform(DDTypeUniform {
+					binding,
+					size: size_of::<BlockCamera3d>(),
+				}),
+			]),
 		))
 	}
 
 	fn create_descriptor_set_layout(
 		device: &Arc<vpb::Device>,
-		binding: u32,
+		binding: BindingId,
 	) -> vk::DescriptorSetLayout { unsafe {
 		let descriptor_set_layout_binding = vk::DescriptorSetLayoutBinding::builder()
-			.binding(binding)
+			.binding(binding.0)
 			.descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
 			.stage_flags(vk::ShaderStageFlags::VERTEX)
 			.descriptor_count(1)

@@ -4,6 +4,7 @@ use ash::vk::{Instance, self};
 use glfw::{Key, Action, MouseButton};
 use nalgebra::vector;
 use shaderc::{ShaderKind, CompileOptions};
+use vpb::ProgramData;
 
 use crate::{Scene, pipelines::ui_example::PipelineUIExample, EnginePipeline};
 
@@ -19,24 +20,8 @@ pub enum TickResult {
 
 pub struct Program {
 	pub scene: Arc<Scene>,
-	pub program_data: ProgramData,
+	pub program_data: vpb::ProgramData,
 	// pub images: Vec<vk::Image>,
-}
-
-#[derive(Clone)]
-pub struct ProgramData {
-	pub window: Arc<vpb::Window>,
-	pub instance: Arc<vpb::Instance>,
-	pub surface: Arc<vpb::Surface>,
-	pub device: Arc<vpb::Device>,
-	pub swapchain: Arc<vpb::Swapchain>,
-	pub render_pass: Arc<vpb::RenderPass>,
-	pub descriptor_pool: Arc<vpb::DescriptorPool>,
-	pub command_pool: Arc<vpb::CommandPool>,
-	pub command_buffer_setup: Arc<vpb::CommandBuffer>,
-	pub command_buffer_draw: Arc<vpb::CommandBuffer>,
-	pub shader_loader: Arc<vpb::ShaderLoader>,
-	pub frame_count: usize,
 }
 
 impl Program {
@@ -85,10 +70,11 @@ impl Program {
 		);
 		let descriptor_pool = vpb::DescriptorPool::new(
 			&device,
-			3, // Use 3 frames for max descriptor sets.
+			3, // TODO: remove
 		);
 		let shader_loader = vpb::ShaderLoader::new();
 		let mut program_data = ProgramData {
+			allocator: Arc::new(None),
 			window: Arc::new(window),
 			instance: Arc::new(instance),
 			surface: Arc::new(surface),
@@ -238,54 +224,4 @@ impl Program {
 		};
 		TickResult::CONTINUE
 	}
-}
-
-impl ProgramData {
-	pub fn load_shader(
-		&self,
-		shader_kind: ShaderKind,
-		name: &str,
-	) -> vk::ShaderModule { unsafe {
-		let options = CompileOptions::new().unwrap();
-		let glsl_path = ("res/shaders/".to_string() + name) + match shader_kind {
-			ShaderKind::Vertex => ".vert",
-			ShaderKind::Fragment => ".frag",
-			ShaderKind::Compute => ".comp",
-			_ => { panic!("not impl"); }
-		};
-		let glsl_path = glsl_path.as_str();
-		let spv_path = ("res/shaders/".to_string() + name) + ".spv";
-		let spv_path = spv_path.as_str();
-		let mut file = File::open(glsl_path).expect(
-			format!("shader \"{}\" does not exist", glsl_path).as_str()
-		);
-		let mut text: String = String::with_capacity(1024);
-		file.read_to_string(&mut text).unwrap();
-		let binary_artifact = self.shader_loader.compiler.compile_into_spirv(
-			text.as_str(),
-			shader_kind,
-			glsl_path, "main",
-			Some(&options),
-		).expect(format!("failed to compile \"{}\"", glsl_path).as_str());
-		debug_assert_eq!(Some(&0x07230203), binary_artifact.as_binary().first());
-		// let text_artifact = shader_loader.compiler.compile_into_spirv_assembly(
-		// 	text.as_str(),
-		// 	shader_kind,
-		// 	glsl_path, "main",
-		// 	Some(&shader_loader.options),
-		// ).expect(format!("failed to compile \"{}\"", glsl_path).as_str());
-		// debug_assert!(text_artifact.as_text().starts_with("; SPIR-V\n"));
-		// let mut spv_file = File::open(spv_path).unwrap();
-		// let spv_text = read_spv(&mut spv_file).unwrap();
-	
-		let spv_text = binary_artifact.as_binary();
-	
-		let shader_info = vk::ShaderModuleCreateInfo::builder()
-			.code(spv_text)
-			.build();
-		self.device.device.create_shader_module(
-			&shader_info,
-			None,
-		).unwrap()
-	}}
 }

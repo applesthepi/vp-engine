@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ash::vk;
+use vpb::ProgramData;
 
-use crate::{ProgramData, EnginePipeline, pf, InputState, RenderState, rendering::{RenderingState, sub}, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::UpdateState, ObjectStateBuffers};
+use crate::{EnginePipeline, pf, InputState, RenderState, rendering::{RenderingState, sub}, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::UpdateState, ObjectStateBuffers};
 
 pub struct Bucket {
 	pub name: String,
@@ -112,8 +113,7 @@ impl Bucket {
 		for object in self.objects_us.iter_mut() {
 			let wa_object = vpb::gmuc_ref!(object);
 			wa_object.update_block_states(
-				&self.program_data.instance,
-				&self.program_data.device,
+				&self.program_data,
 				render_state.frame,
 				self.program_data.frame_count,
 				command_buffer,
@@ -154,7 +154,7 @@ impl Bucket {
 			);
 			let block_state_layouts: Vec<vk::DescriptorSet> = block_states.iter().map(
 				|x| {
-					x.frame_sets[frame].set
+					x.descriptor_data.descriptor_sets[frame]
 				}
 			).collect();
 			device.device.cmd_bind_descriptor_sets(
@@ -185,10 +185,14 @@ impl Bucket {
 				ObjectStateBuffers::GOIndirect(
 					indirect_buffer,
 				) => {
+					let buffer = match &indirect_buffer.indirect.buffer {
+						vpb::BufferType::Buffer(buffer) => buffer,
+						vpb::BufferType::Image(_) => unreachable!(),
+					};
 					device.device.cmd_draw_indexed_indirect(
 						command_buffer,
-						indirect_buffer.indirect.memory.as_ref().unwrap_unchecked().0,
-						0,
+						buffer.buffer,
+						buffer.buffer_offset as u64,
 						indirect_buffer.indirect_count as u32,
 						std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32,
 					);
@@ -216,7 +220,7 @@ impl Bucket {
 		let pipeline_info = vpb::gmuc!(pipeline_info);
 		for block_state in pipeline_info.block_states.iter_mut() {
 			let block_state = vpb::gmuc!(*block_state);
-			block_state.destroy_memory(&self.program_data.device);
+			block_state.destroy_memory(&self.program_data);
 		}
 		for object in self.objects_rs.iter() {
 			let mut state = object.sub_state();
@@ -226,7 +230,7 @@ impl Bucket {
 			);
 			for block_state in block_states.iter_mut().skip(1) {
 				let block_state = vpb::gmuc_ref!(block_state);
-				block_state.destroy_memory(&self.program_data.device);
+				block_state.destroy_memory(&self.program_data);
 			}
 		}
 	}}
@@ -239,9 +243,7 @@ impl Bucket {
 		for block_state in pipeline_info.block_states.iter_mut() {
 			let block_state = vpb::gmuc_ref!(block_state);
 			block_state.recreate_memory(
-				&self.program_data.device,
-				&self.program_data.instance,
-				&self.program_data.descriptor_pool.descriptor_pool,
+				&self.program_data,
 				self.program_data.frame_count,
 			);
 		}
@@ -254,9 +256,7 @@ impl Bucket {
 			for block_state in block_states.iter_mut().skip(1) {
 				let block_state = vpb::gmuc_ref!(block_state);
 				block_state.recreate_memory(
-					&self.program_data.device,
-					&self.program_data.instance,
-					&self.program_data.descriptor_pool.descriptor_pool,
+					&self.program_data,
 					self.program_data.frame_count,
 				);
 			}

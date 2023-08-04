@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use ash::vk;
-use vpb::{VertexBuffer, IndexBuffer, InstanceBuffer};
-
-use crate::ProgramData;
+use vpb::{VertexBuffer, IndexBuffer, InstanceBuffer, ProgramData};
 
 /// Contains vertex and index buffers. Stores different configurations of those.
 pub enum ObjectStateBuffers {

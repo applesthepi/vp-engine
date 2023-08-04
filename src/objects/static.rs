@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use vpb::ProgramData;
+
 use crate::StaticDirtyState;
 
 use self::state::StaticState;
@@ -23,20 +25,18 @@ pub trait ObjectStatic {
 
 	fn update_vib(
 		&mut self,
-		instance: &vpb::Instance,
-		device: &vpb::Device,
+		program_data: &ProgramData,
 	);
 
 	fn update_bs(
 		&mut self,
-		device: &vpb::Device,
+		program_data: &ProgramData,
 		frame: usize,
 	);
 
 	fn update_block_states(
 		&mut self,
-		instance: &vpb::Instance,
-		device: &vpb::Device,
+		program_data: &ProgramData,
 		frame: usize,
 		frame_count: usize,
 	) {
@@ -45,11 +45,11 @@ pub trait ObjectStatic {
 		let dirty_state = &mut state.dirty_state;
 		let bs_left = &mut state.bs_left;
 		if bit_compare!(*dirty_state, StaticDirtyState::VIB) {
-			self.update_vib(instance, device);
+			self.update_vib(program_data);
 		}
 		let bs_state = bit_compare!(*dirty_state, StaticDirtyState::BS);
 		if bs_state || *bs_left > 0 {
-			self.update_bs(device, frame);
+			self.update_bs(program_data, frame);
 			if bs_state {
 				*bs_left = frame_count as u8 - 1;
 

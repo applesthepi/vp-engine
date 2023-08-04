@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ash::vk;
+use vpb::ProgramData;
 
-use crate::{ObjectStateBuffers, DynamicDirtyState, ProgramData, rendering::{RenderingState, sub::SubState}, objects::buffers};
+use crate::{ObjectStateBuffers, DynamicDirtyState, rendering::{RenderingState, sub::SubState}, objects::buffers};
 
 /// Every dynamic object has an object state to be referenced from parents.
 pub struct DynamicState {

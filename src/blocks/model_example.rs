@@ -2,6 +2,7 @@ use std::{mem::size_of, sync::Arc};
 
 use ash::vk;
 use nalgebra::{Vector4, Matrix4};
+use vpb::{DescriptorDescription, DDType, DDTypeUniform, BindingId, ProgramData};
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -12,33 +13,32 @@ pub struct BlockModelExample {
 
 impl vpb::Block for BlockModelExample {
 	fn create_block_state(
-		device: &vpb::Device,
-		instance: &vpb::Instance,
-		descriptor_pool: &vk::DescriptorPool,
+		program_data: &ProgramData,
 		descriptor_set_layout: &vk::DescriptorSetLayout,
 		frame_count: usize,
-		binding: u32,
-		set: u32,
+		binding: vpb::BindingId,
+		set: vpb::SetId,
 	) -> Arc<vpb::BlockState> {
 		Arc::new(vpb::BlockState::new(
-			device,
-			instance,
-			descriptor_pool,
+			program_data,
 			descriptor_set_layout,
 			frame_count,
-			binding,
 			set,
-			size_of::<BlockModelExample>(),
-			1,
+			DescriptorDescription::new(&[
+				DDType::Uniform(DDTypeUniform {
+					binding,
+					size: size_of::<BlockModelExample>(),
+				}),
+			]),
 		))
 	}
 
 	fn create_descriptor_set_layout(
 		device: &Arc<vpb::Device>,
-		binding: u32,
+		binding: BindingId,
 	) -> vk::DescriptorSetLayout { unsafe {
 		let descriptor_set_layout_binding = vk::DescriptorSetLayoutBinding::builder()
-			.binding(binding)
+			.binding(binding.0)
 			.descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
 			.stage_flags(vk::ShaderStageFlags::VERTEX)
 			.descriptor_count(1)

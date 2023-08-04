@@ -7,8 +7,9 @@ pub use camera2d::*;
 mod model_example;
 pub use model_example::*;
 use nalgebra::Matrix4;
+use vpb::ProgramData;
 
-use crate::{ProgramData, InputState, RenderState};
+use crate::{InputState, RenderState};
 
 pub trait Camera {
 	fn build_perspective(

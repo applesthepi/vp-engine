@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use ash::vk;
-
-use crate::ProgramData;
+use vpb::ProgramData;
 
 use self::sub::SubState;
 

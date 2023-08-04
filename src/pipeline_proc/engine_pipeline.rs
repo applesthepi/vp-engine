@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ash::vk;
+use vpb::ProgramData;
 
-use crate::{PipelineInfo, ProgramData, InputState, RenderState, rendering::RenderingState};
+use crate::{PipelineInfo, InputState, RenderState, rendering::RenderingState};
 
 pub struct ObjectBlockStructure {
 	pub spawners: Vec<Box<dyn vpb::BlockSpawnerGen>>,

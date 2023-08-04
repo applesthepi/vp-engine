@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use ash::vk;
 use shaderc::ShaderKind;
-use crate::ProgramData;
 
 mod engine_pipeline;
 pub use engine_pipeline::*;
@@ -10,6 +9,7 @@ mod pipeline_info;
 pub use pipeline_info::*;
 pub mod pf;
 pub use pf::*;
+use vpb::ProgramData;
 
 #[derive(Copy, Clone)]
 pub enum ViewportDepthRange {

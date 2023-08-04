@@ -4,9 +4,9 @@ use std::{sync::Arc, marker::PhantomData, time::Instant};
 
 use ash::{vk, prelude::VkResult};
 pub use bucket::*;
-use vpb::{create_depth_image, create_presentation_images};
+use vpb::{create_depth_image, create_presentation_images, ProgramData};
 
-use crate::{VertexUI, ProgramData, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui_example::PipelineUIExample, EnginePipeline, CameraState3d, Camera};
+use crate::{VertexUI, pd_vdevice, pd_device, InputState, RenderState, RenderStateLocal, pipelines::ui_example::PipelineUIExample, EnginePipeline, CameraState3d, Camera};
 
 pub struct Scene {
 	pub program_data: ProgramData,
@@ -45,6 +45,12 @@ impl Scene {
 			&mut program_data,
 		);
 		program_data.frame_count = framebuffers.len();
+		*vpb::gmuc!(program_data.allocator) = Some(ProgramData::create_allocator(
+			program_data.instance.instance.clone(),
+			program_data.device.device.clone(),
+			program_data.device.physical_device,
+			program_data.frame_count,
+		));
 		let mut buckets: Vec<Box<Bucket>> = Vec::with_capacity(8);
 		let frame_count = program_data.frame_count;
 		let mut scene = Self {

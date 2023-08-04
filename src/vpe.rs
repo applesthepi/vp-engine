@@ -1,6 +1,7 @@
 #![feature(get_mut_unchecked)]
 #![feature(core_intrinsics)]
 #![feature(return_position_impl_trait_in_trait)]
+#![feature(yeet_expr)]
 
 mod program;
 pub use program::*;

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ash::vk;
+use vpb::ProgramData;
 
-use crate::{ViewportDepthRange, PipelineInfo, BlockCamera2d, ProgramData, BlockModelExample, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState, CameraState2d, Camera};
+use crate::{ViewportDepthRange, PipelineInfo, BlockCamera2d, BlockModelExample, EnginePipeline, ObjectBlockStructure, VertexUI, InputState, RenderState, CameraState2d, Camera};
 
 pub struct PipelineUIExample {
 	pipeline_info: Arc<PipelineInfo>,
@@ -20,7 +21,7 @@ impl PipelineUIExample {
 			spawners: vec![
 				Box::new(vpb::BlockSpawner::<BlockCamera2d>::new(
 					&program_data.device,
-					0, 0,
+					vpb::BindingId(0), vpb::SetId(0),
 				))
 			],
 		});
@@ -28,7 +29,7 @@ impl PipelineUIExample {
 			spawners: vec![
 				Box::new(vpb::BlockSpawner::<BlockModelExample>::new(
 					&program_data.device,
-					1, 1,
+					vpb::BindingId(1), vpb::SetId(1),
 				))
 			],
 		});

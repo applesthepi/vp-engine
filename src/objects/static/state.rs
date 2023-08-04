@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ash::vk;
+use vpb::ProgramData;
 
-use crate::{ObjectStateBuffers, StaticDirtyState, ProgramData, objects::buffers, rendering::{sub::SubState, RenderingState}};
+use crate::{ObjectStateBuffers, StaticDirtyState, objects::buffers, rendering::{sub::SubState, RenderingState}};
 
 /// Every static object has an object state to be referenced from parents.
 pub struct StaticState {

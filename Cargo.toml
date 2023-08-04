@@ -20,11 +20,15 @@ opt-level = 0
 
 [dependencies]
 vpb = { path="vp-base" }
+# gpu-alloc = "0.6.0"
+# gpu-alloc-ash = "0.6.0"
+vk-mem = "0.2.2"
+ash = { version = "0.37", features = ["linked"] }
 glfw = { version = "0.52.0", features = ["vulkan"] }
-ash = { version = "0.37.3+1.3.251", features = ["linked"] }
 shaderc = "0.8.2"
 memoffset = "0.8.0"
 nalgebra = "0.31.4"
 bytemuck = "1.13.1"
 glm = "0.2.3"
 bitflags = "2.3.2"
+png = "0.17.9"

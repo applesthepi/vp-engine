@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::{EnginePipeline, ProgramData};
+use vpb::ProgramData;
+
+use crate::{EnginePipeline};
 
 pub fn create_object_block_states(
 	program_data: &ProgramData,
@@ -10,9 +12,7 @@ pub fn create_object_block_states(
 	structure.spawners.iter().map(
 		|x|
 		x.spawn(
-			&program_data.device,
-			&program_data.instance,
-			&program_data.descriptor_pool.descriptor_pool,
+			program_data,
 			program_data.frame_count,
 		)
 	).collect()
