@@ -1,6 +1,7 @@
 use std::{mem::size_of, sync::Arc, f32::consts::{PI, FRAC_PI_2}};
 
 use ash::vk;
+use bytemuck::{Zeroable, Pod};
 use glfw::ffi;
 use nalgebra::{Matrix4, vector, Vector3, Vector2, Perspective3};
 use vpb::{DDType, DDTypeUniform, DescriptorDescription, BindingId, ProgramData};
@@ -8,17 +9,17 @@ use vpb::{DDType, DDTypeUniform, DescriptorDescription, BindingId, ProgramData};
 use crate::{InputState, RenderState, Camera};
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct BlockCamera3d {
-	pub view: Matrix4<f32>,
-	pub projection: Matrix4<f32>,
+	pub view: [f32; 16],
+	pub projection: [f32; 16],
 }
 
 impl Default for BlockCamera3d {
 	fn default() -> Self {
 		Self {
-			view: Matrix4::identity(),
-			projection: Matrix4::identity(),
+			view: Matrix4::identity().as_slice().try_into().unwrap(),
+			projection: Matrix4::identity().as_slice().try_into().unwrap(),
 		}
 	}
 }
@@ -36,7 +37,7 @@ impl vpb::Block for BlockCamera3d {
 			descriptor_set_layout,
 			frame_count,
 			set,
-			DescriptorDescription::new(&[
+			DescriptorDescription::new(vec![
 				DDType::Uniform(DDTypeUniform {
 					binding,
 					size: size_of::<BlockCamera3d>(),
@@ -106,13 +107,14 @@ impl Camera for CameraState3d {
 		&mut self,
 		program_data: &ProgramData,
 	) {
-		self.block.projection = *Perspective3::new(
+		let mut data = *Perspective3::new(
 			program_data.window.extent.width as f32 /
 			program_data.window.extent.height as f32,
 			90.0,
 			0.1, 10_000.0,
 		).as_matrix();
-		self.block.projection[(1, 1)] *= -1.0;
+		data[(1, 1)] *= -1.0;
+		self.block.projection = data.as_slice().try_into().unwrap();
 	}
 
 	fn build_view(
@@ -200,7 +202,7 @@ impl Camera for CameraState3d {
 			-self.camera_postposition.z
 		]);
 		let view_matrix = rotation_cam * translation;
-		self.block.view = view_matrix;
+		self.block.view = view_matrix.as_slice().try_into().unwrap();
 	}
 
 	fn update(
@@ -219,6 +221,6 @@ impl Camera for CameraState3d {
 	fn get_view(
 		&self,
 	) -> (Matrix4<f32>, f32) {
-		(self.block.view, 1.0)
+		(Matrix4::from_column_slice(&self.block.view), 1.0)
 	}
 }

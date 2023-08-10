@@ -24,7 +24,7 @@ impl vpb::Block for BlockModelExample {
 			descriptor_set_layout,
 			frame_count,
 			set,
-			DescriptorDescription::new(&[
+			DescriptorDescription::new(vec![
 				DDType::Uniform(DDTypeUniform {
 					binding,
 					size: size_of::<BlockModelExample>(),

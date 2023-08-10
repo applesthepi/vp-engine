@@ -10,7 +10,7 @@ use crate::{VertexUI, pd_vdevice, pd_device, InputState, RenderState, RenderStat
 
 pub struct Scene {
 	pub program_data: ProgramData,
-	buckets: Vec<Box<Bucket>>,
+	pub buckets: Vec<Box<Bucket>>,
 	semaphore_present: vk::Semaphore,
 	semaphore_render: vk::Semaphore,
 	framebuffers: Vec<vk::Framebuffer>,

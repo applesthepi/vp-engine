@@ -1,22 +1,23 @@
 use std::{mem::size_of, sync::Arc, f32::consts::{PI, FRAC_PI_2}, collections::{HashSet, BTreeMap}};
 
 use ash::vk;
+use bytemuck::{Zeroable, Pod};
 use nalgebra::{Matrix4, vector, Vector3, Vector2, Perspective3, Orthographic3, point, Point3};
 use vpb::{BindingId, DDType, DescriptorDescription, DDTypeUniform, ProgramData};
 use crate::{InputState, RenderState, Camera};
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct BlockCamera2d {
-	pub view: Matrix4<f32>,
-	pub projection: Matrix4<f32>,
+	pub view: [f32; 16],
+	pub projection: [f32; 16],
 }
 
 impl Default for BlockCamera2d {
 	fn default() -> Self {
 		Self {
-			view: Matrix4::identity(),
-			projection: Matrix4::identity(),
+			view: Matrix4::identity().as_slice().try_into().unwrap(),
+			projection: Matrix4::identity().as_slice().try_into().unwrap(),
 		}
 	}
 }
@@ -34,7 +35,7 @@ impl vpb::Block for BlockCamera2d {
 			descriptor_set_layout,
 			frame_count,
 			set,
-			DescriptorDescription::new(&[
+			DescriptorDescription::new(vec![
 				DDType::Uniform(DDTypeUniform {
 					binding,
 					size: size_of::<BlockCamera2d>(),
@@ -136,7 +137,7 @@ impl Camera for CameraState2d {
 		&mut self,
 		program_data: &ProgramData,
 	) {
-		self.block.projection = *Orthographic3::new(
+		let data = *Orthographic3::new(
 			0.0,
 			program_data.window.extent.width as f32,
 			0.0,
@@ -144,6 +145,7 @@ impl Camera for CameraState2d {
 			-1_000.0,
 			1_000.0,
 		).as_matrix();
+		self.block.projection = data.as_slice().try_into().unwrap();
 	}
 
 	fn build_view(
@@ -207,7 +209,7 @@ impl Camera for CameraState2d {
 			0.0
 		]);
 		let view: Matrix4<f32> = view.append_scaling(translate_scale_dynamic);
-		self.block.view = view;
+		self.block.view = view.as_slice().try_into().unwrap();
 	}
 
 	fn update(
@@ -227,6 +229,6 @@ impl Camera for CameraState2d {
 		&self,
 	) -> (Matrix4<f32>, f32) {
 		let translate_scale_dynamic = self.max_zoom / (self.postdistance as f32);
-		(self.block.view, translate_scale_dynamic)
+		(Matrix4::<f32>::from_column_slice(&self.block.view), translate_scale_dynamic)
 	}
 }
