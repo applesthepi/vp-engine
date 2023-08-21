@@ -109,18 +109,17 @@ fn create_pipeline<V: vpb::Vertex>(
 		.build();
 	let color_blend_attachment_states = [
 		vk::PipelineColorBlendAttachmentState::builder()
-			.blend_enable(false)
-			.src_color_blend_factor(vk::BlendFactor::SRC_COLOR)
-			.dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_DST_COLOR)
+			.blend_enable(true)
+			.src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)//SRC_COLOR)
+			.dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)//ONE_MINUS_DST_COLOR)
 			.color_blend_op(vk::BlendOp::ADD)
-			.src_alpha_blend_factor(vk::BlendFactor::ZERO)
-			.dst_alpha_blend_factor(vk::BlendFactor::ZERO)
+			.src_alpha_blend_factor(vk::BlendFactor::SRC_ALPHA)
+			.dst_alpha_blend_factor(vk::BlendFactor::DST_ALPHA)
 			.alpha_blend_op(vk::BlendOp::ADD)
 			.color_write_mask(vk::ColorComponentFlags::RGBA)
 			.build(),
 	];
 	let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
-		.logic_op(vk::LogicOp::CLEAR)
 		.attachments(&color_blend_attachment_states)
 		.build();
 	let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
@@ -167,7 +166,7 @@ fn create_pipeline<V: vpb::Vertex>(
 		let depth_state_info = vk::PipelineDepthStencilStateCreateInfo::builder()
 			.depth_test_enable(true)
 			.depth_write_enable(true)
-			.depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+			.depth_compare_op(vk::CompareOp::LESS)
 			.front(stencil_state_info)
 			.back(stencil_state_info)
 			.max_depth_bounds(1.0)

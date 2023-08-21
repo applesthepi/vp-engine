@@ -90,7 +90,7 @@ impl CameraState2d {
 	) -> Self {
 		// max_zoom: (0.0, inf)
 		// tile px width of max zoom
-		let max_zoom: f32 = 100.0;
+		let max_zoom: f32 = 200.0;
 		// predistance_index: [0, inf)
 		// how many scrolls away from 0 (per tile max zoom).
 		let predistance_index: i16 = 2;

@@ -33,14 +33,30 @@ impl Bucket {
 		}
 	}
 
-	pub fn get_static_object(
+	pub fn get_static_object_rs(
 		&self,
 		name: &str,
 	) -> Arc<dyn RenderingState> {
-		self.objects_rs.iter().find(
-			|x|
-			x.sub_state().name == name
-		).expect(format!("no object with name \"{}\" inside bucket \"{}\"", name, self.name).as_str()).clone()
+		let (
+			i,
+			_,
+		) = self.object_names.iter().enumerate().find(
+			|(_, x)| *x == name
+		).expect("failed to find object");
+		self.objects_rs[i].clone()
+	}
+
+	pub fn get_static_object_us(
+		&self,
+		name: &str,
+	) -> Arc<dyn UpdateState> {
+		let (
+			i,
+			_,
+		) = self.object_names.iter().enumerate().find(
+			|(_, x)| *x == name
+		).expect("failed to find object");
+		self.objects_us[i].clone()
 	}
 
 	pub fn add_static_object(
