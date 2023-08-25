@@ -1,6 +1,8 @@
 use ash::vk;
 use vpb::ProgramData;
 
+use crate::{InputState, RenderState};
+
 pub trait UpdateState {
 	/// Give the option for the object to update their
 	/// block states during the render loop.

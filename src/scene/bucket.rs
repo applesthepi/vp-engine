@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ash::vk;
 use vpb::ProgramData;
 
-use crate::{EnginePipeline, pf, InputState, RenderState, rendering::{RenderingState, sub}, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::UpdateState, ObjectStateBuffers};
+use crate::{EnginePipeline, pf, InputState, RenderState, rendering::{RenderingState, sub}, r#static::{ObjectStatic, state::StaticState}, dynamic::{ObjectDynamic, state::DynamicState}, update::{UpdateState}, ObjectStateBuffers};
 
 pub struct Bucket {
 	pub name: String,
